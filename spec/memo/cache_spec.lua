@@ -600,4 +600,123 @@ describe("memo.cache", function()
       assert.is_true(ns.has "bar:b")
     end)
   end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- compute + TTL interaction
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("compute with TTL", function()
+    it("computed values expire after TTL", function()
+      local clock = 1000
+      cache.configure {
+        ttl = { default = 10 },
+        clock = function()
+          return clock
+        end,
+      }
+      local calls = 0
+      local fn = function()
+        calls = calls + 1
+        return "result"
+      end
+      cache.compute("work", fn) -- miss, stores with TTL
+      assert.are.equal(1, calls)
+      clock = 1005
+      cache.compute("work", fn) -- hit (still fresh)
+      assert.are.equal(1, calls)
+      clock = 1011
+      cache.compute("work", fn) -- miss (expired), re-computes
+      assert.are.equal(2, calls)
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- max_entries with only fresh entries (arbitrary eviction)
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("max_entries arbitrary eviction", function()
+    it("evicts an arbitrary entry when none are expired", function()
+      cache.configure { max_entries = 2 }
+      cache.set("a", 1)
+      cache.set("b", 2)
+      cache.set("c", 3)
+      -- One of a/b was evicted; c survives as the newest.
+      local ks = cache.keys()
+      assert.are.equal(2, #ks)
+      assert.are.equal(3, cache.get "c")
+    end)
+
+    it("evicts down to limit when well over capacity", function()
+      cache.configure { max_entries = 2 }
+      cache.set("a", 1)
+      cache.set("b", 2)
+      cache.set("c", 3)
+      cache.set("d", 4)
+      local ks = cache.keys()
+      assert.are.equal(2, #ks)
+      assert.are.equal(4, cache.get "d")
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- clear with combined prefix and older_than
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("clear with prefix + older_than", function()
+    it("applies prefix and older_than as independent sequential passes", function()
+      local clock = 1000
+      cache.configure {
+        ttl = { default = 60 },
+        clock = function()
+          return clock
+        end,
+      }
+      cache.set("ns:old", "x")
+      clock = 1050
+      cache.set("ns:new", "y")
+      cache.set("other:old_ish", "z") -- created at 1050
+      clock = 1000 -- reset so "other:old_ish" appears old (created at 1050)
+      -- Wait — we need a key that IS old for older_than.
+      -- Let's reset and build a cleaner scenario.
+      cache.clear()
+      clock = 1000
+      cache.set("ns:a", 1)
+      cache.set("other:b", 2)
+      clock = 1050
+      cache.set("other:c", 3) -- recent
+
+      -- prefix pass removes ALL "ns:" keys (regardless of age).
+      -- older_than pass then removes entries older than 30s from what's left.
+      cache.clear { prefix = "ns:", older_than = 30 }
+
+      -- ns:a removed by prefix pass.
+      assert.is_nil(cache.get "ns:a")
+      -- other:b (created at 1000, 50s ago) removed by older_than pass.
+      assert.is_nil(cache.get "other:b")
+      -- other:c (created at 1050, 0s ago) survives.
+      assert.are.equal(3, cache.get "other:c")
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- Stats: eviction via TTL expiry on get
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("stats eviction via TTL", function()
+    it("counts evictions when expired entries are accessed", function()
+      local clock = 1000
+      cache.configure {
+        stats = true,
+        ttl = { default = 5 },
+        clock = function()
+          return clock
+        end,
+      }
+      cache.set("k", "v")
+      clock = 1006
+      cache.get "k" -- triggers eviction of expired entry
+      local st = cache.stats()
+      assert.are.equal(1, st.evictions)
+    end)
+  end)
 end)

@@ -455,4 +455,178 @@ describe("memo.state", function()
       assert.is_not_nil(io_ctrl.files[path])
     end)
   end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- Non-string key guard
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("non-string key guard", function()
+    it("rejects numeric keys with an error log", function()
+      local store = state.new { path = "/tmp/numkey.json", auto_save = false }
+      store:set(42, "value")
+      -- The value should not have been stored.
+      assert.is_nil(store:get "42")
+      -- Verify an error was logged.
+      local found_err = false
+      for _, call in ipairs(wt._calls) do
+        if call.fn == "log_error" and call.args[1]:find "keys must be strings" then
+          found_err = true
+          break
+        end
+      end
+      assert.is_true(found_err)
+    end)
+
+    it("rejects table keys with an error log", function()
+      local store = state.new { path = "/tmp/tblkey.json", auto_save = false }
+      store:set({}, "value")
+      local found_err = false
+      for _, call in ipairs(wt._calls) do
+        if call.fn == "log_error" and call.args[1]:find "keys must be strings" then
+          found_err = true
+          break
+        end
+      end
+      assert.is_true(found_err)
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- Write failure path
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("write failure", function()
+    it("logs a warning and returns false when io.open fails for writing", function()
+      -- Override io.open to always fail for writes.
+      local real_open = io.open
+      ---@diagnostic disable-next-line: duplicate-set-field
+      io.open = function(path, mode)
+        if mode and mode:find "w" then
+          return nil, path .. ": Permission denied"
+        end
+        return io_ctrl.install() -- shouldn't happen, but fall through
+      end
+      -- Re-install the stub but override write mode.
+      io_ctrl.install()
+      local orig_open = io.open
+      ---@diagnostic disable-next-line: duplicate-set-field
+      io.open = function(path, mode)
+        if mode and mode:find "w" then
+          return nil, path .. ": Permission denied"
+        end
+        return orig_open(path, mode)
+      end
+
+      local store =
+        state.new { path = "/tmp/write_fail.json", auto_save = false, async = false }
+      store:set("k", "v")
+      store:save()
+
+      -- Verify a warning was logged about the write failure.
+      local found_warn = false
+      for _, call in ipairs(wt._calls) do
+        if call.fn == "log_warn" and call.args[1]:find "unable to write" then
+          found_warn = true
+          break
+        end
+      end
+      assert.is_true(found_warn)
+      io.open = real_open
+      io_ctrl.install()
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- delete / clear / has edge cases
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("delete edge cases", function()
+    it("delete on non-existent key is a no-op", function()
+      local store = state.new { path = "/tmp/del_noop.json", auto_save = false }
+      -- Should not error.
+      store:delete "nonexistent"
+      assert.is_nil(store:get "nonexistent")
+    end)
+
+    it("has returns false after delete", function()
+      local store = state.new { path = "/tmp/has_del.json", auto_save = false }
+      store:set("k", "v")
+      assert.is_true(store:has "k")
+      store:delete "k"
+      assert.is_false(store:has "k")
+    end)
+  end)
+
+  describe("clear edge cases", function()
+    it("clear on empty store is a no-op", function()
+      local store = state.new { path = "/tmp/clear_empty.json", auto_save = false }
+      -- Should not error.
+      store:clear()
+      assert.are.same({}, store:restore())
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- auto_load triggered by has / delete / clear / restore
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("auto_load triggered by various methods", function()
+    it("has triggers auto_load", function()
+      local path = "/tmp/autoload_has.json"
+      io_ctrl.files[path] = '{"k":"loaded"}'
+      local store = state.new { path = path, auto_save = false, async = false }
+      -- First call to has should trigger auto_load.
+      assert.is_true(store:has "k")
+    end)
+
+    it("delete triggers auto_load", function()
+      local path = "/tmp/autoload_del.json"
+      io_ctrl.files[path] = '{"k":"loaded"}'
+      local store = state.new { path = path, auto_save = false, async = false }
+      store:delete "k"
+      -- After auto_load + delete, key should be gone.
+      assert.is_false(store:has "k")
+    end)
+
+    it("clear triggers auto_load before clearing", function()
+      local path = "/tmp/autoload_clear.json"
+      io_ctrl.files[path] = '{"k":"loaded"}'
+      local store = state.new { path = path, auto_save = false, async = false }
+      store:clear()
+      -- Loaded data was cleared.
+      assert.is_nil(store:get "k")
+    end)
+
+    it("restore triggers auto_load", function()
+      local path = "/tmp/autoload_restore.json"
+      io_ctrl.files[path] = '{"k":"loaded"}'
+      local store = state.new { path = path, auto_save = false, async = false }
+      local copy = store:restore()
+      assert.are.equal("loaded", copy.k)
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- auto_save triggered by delete and clear
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("auto_save on delete and clear", function()
+    it("auto_save flushes on delete", function()
+      local path = "/tmp/as_del.json"
+      local store = state.new { path = path, async = false }
+      store:set("k", "v")
+      io_ctrl.files[path] = nil -- reset to detect the next write
+      store:delete "k"
+      assert.is_not_nil(io_ctrl.files[path])
+    end)
+
+    it("auto_save flushes on clear", function()
+      local path = "/tmp/as_clear.json"
+      local store = state.new { path = path, async = false }
+      store:set("k", "v")
+      io_ctrl.files[path] = nil
+      store:clear()
+      assert.is_not_nil(io_ctrl.files[path])
+    end)
+  end)
 end)

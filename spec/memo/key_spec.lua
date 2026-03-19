@@ -70,6 +70,28 @@ describe("memo.key", function()
       assert.is_truthy(s:find "<cycle>")
     end)
 
+    it("serializes functions via tostring fallback", function()
+      local fn = function() end
+      local s = serialize(fn)
+      assert.are.equal("string", type(s))
+      -- tostring(fn) produces something like "function: 0x...".
+      assert.is_truthy(s:find "^function")
+    end)
+
+    it("serializes tables with mixed key types deterministically", function()
+      local t = { [1] = "a", ["x"] = "b", [true] = "c" }
+      local s1 = serialize(t)
+      local s2 = serialize(t)
+      assert.are.equal(s1, s2)
+      assert.is_truthy(s1:find "{")
+    end)
+
+    it("serializes deeply nested tables", function()
+      local t = { a = { b = { c = { d = 1 } } } }
+      local s = serialize(t)
+      assert.are.equal(serialize { a = { b = { c = { d = 1 } } } }, s)
+    end)
+
     it("different values produce different strings", function()
       assert.are_not.equal(serialize(true), serialize(false))
       assert.are_not.equal(serialize(nil), serialize(false))
@@ -135,6 +157,17 @@ describe("memo.key", function()
       assert.are.equal("fn", parts[1])
       assert.are.equal("1", parts[2])
       assert.are.equal("T", parts[3])
+    end)
+
+    it("handles nil arguments via serialize", function()
+      local k = make_key("ns", nil)
+      assert.are.equal("ns|N", k)
+    end)
+
+    it("handles function arguments via serialize", function()
+      local fn = function() end
+      local k = make_key("ns", fn)
+      assert.is_truthy(k:find "^ns|function")
     end)
   end)
 end)
