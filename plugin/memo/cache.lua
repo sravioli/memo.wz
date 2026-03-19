@@ -228,10 +228,7 @@ local function maybe_evict()
     end
     if not victim then
       -- Pick arbitrary entry.
-      for k in pairs(SLOT()) do
-        victim = k
-        break
-      end
+      victim = next(SLOT())
     end
     if not victim then
       break

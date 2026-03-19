@@ -16,7 +16,6 @@ local sbyte, sformat = string.byte, string.format
 -- ───────────────────────────────────────────────────────────────────────────
 
 local PRIME32_1 = 0x9E3779B1
-local PRIME32_2 = 0x85EBCA77
 local PRIME32_3 = 0xC2B2AE3D
 local PRIME64_1 = -7046029288634856825 -- 0x9E3779B185EBCA87
 local PRIME64_2 = -4417276706812531889 -- 0xC2B2AE63A9653039
@@ -195,9 +194,7 @@ local function xxh3_64(input)
 
   -- ── len == 0 ────────────────────────────────────────────────────────
   if len == 0 then
-    return xxh3_avalanche(
-      secret64(56) ~ secret64(64)
-    )
+    return xxh3_avalanche(secret64(56) ~ secret64(64))
   end
 
   -- ── 1 <= len <= 3 ──────────────────────────────────────────────────
@@ -207,10 +204,7 @@ local function xxh3_64(input)
     local b3 = sbyte(input, len)
     local combined = (b1 << 16) | (len << 8) | b3
     local combined64 = combined | (b2 << 24)
-    return xxh3_rrmxmx(
-      (secret32(0) ~ secret32(4)) * 1 + combined64,
-      len
-    )
+    return xxh3_rrmxmx((secret32(0) ~ secret32(4)) * 1 + combined64, len)
   end
 
   -- ── 4 <= len <= 8 ──────────────────────────────────────────────────
