@@ -119,12 +119,13 @@ describe("memo.state (serde unavailable)", function()
     local state = reload_state()
     local path = "/tmp/no_serde_load.json"
     io_ctrl.files[path] = '{"k":"from_disk"}'
+    local open_calls_before = io_ctrl.open_calls
     local store = state.new { path = path, auto_load = false, async = false }
     store:load()
     -- Data should NOT have been loaded from disk.
     assert.is_nil(store:get "k")
     -- io.open should not have been called (early return before io.open).
-    assert.are.equal(0, io_ctrl.open_calls)
+    assert.are.equal(open_calls_before, io_ctrl.open_calls)
   end)
 end)
 
