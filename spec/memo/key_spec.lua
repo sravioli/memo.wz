@@ -92,6 +92,36 @@ describe("memo.key", function()
       assert.are.equal(serialize { a = { b = { c = { d = 1 } } } }, s)
     end)
 
+    it("serializes empty string", function()
+      assert.are.equal('""', serialize "")
+    end)
+
+    it("serializes special float values", function()
+      local inf = serialize(math.huge)
+      local neg_inf = serialize(-math.huge)
+      local nan = serialize(0 / 0)
+      assert.are.equal("string", type(inf))
+      assert.are.equal("string", type(neg_inf))
+      assert.are.equal("string", type(nan))
+      -- All three must be distinguishable.
+      assert.are_not.equal(inf, neg_inf)
+      assert.are_not.equal(inf, nan)
+    end)
+
+    it("serializes tables with only numeric keys", function()
+      local t = { [1] = "a", [2] = "b", [3] = "c" }
+      local s = serialize(t)
+      assert.is_truthy(s:find "{")
+      assert.are.equal(s, serialize { [1] = "a", [2] = "b", [3] = "c" })
+    end)
+
+    it("serializes coroutine via tostring fallback", function()
+      local co = coroutine.create(function() end)
+      local s = serialize(co)
+      assert.are.equal("string", type(s))
+      assert.is_truthy(s:find "^thread")
+    end)
+
     it("different values produce different strings", function()
       assert.are_not.equal(serialize(true), serialize(false))
       assert.are_not.equal(serialize(nil), serialize(false))
@@ -168,6 +198,24 @@ describe("memo.key", function()
       local fn = function() end
       local k = make_key("ns", fn)
       assert.is_truthy(k:find "^ns|function")
+    end)
+
+    it("handles empty name", function()
+      assert.are.equal("", make_key "")
+      assert.are.equal("|a", make_key("", "a"))
+    end)
+
+    it("name containing pipe delimiter collides with single-arg key", function()
+      -- This documents a known limitation: the name is not escaped,
+      -- so "a|b" with no args produces the same key as "a" with arg "b".
+      local k1 = make_key "a|b"
+      local k2 = make_key("a", "b")
+      assert.are.equal(k1, k2)
+    end)
+
+    it("multiple nil arguments all serialized", function()
+      local k = make_key("ns", nil, nil, nil)
+      assert.are.equal("ns|N|N|N", k)
     end)
   end)
 end)

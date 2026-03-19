@@ -629,4 +629,164 @@ describe("memo.state", function()
       assert.is_not_nil(io_ctrl.files[path])
     end)
   end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- load: non-table decoded value is silently ignored
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("load non-table JSON", function()
+    it("ignores decoded value when it is not a table", function()
+      local path = "/tmp/non_table.json"
+      io_ctrl.files[path] = '"just a string"'
+      wt.serde.json_decode = function()
+        return "just a string"
+      end
+      local store = state.new { path = path, auto_load = false, async = false }
+      store:load()
+      -- Store should remain empty (non-table decoded result ignored).
+      assert.are.same({}, store:restore())
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- load: read error (not "No such file") logs warning
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("load read error", function()
+    it("logs warning for non-missing-file errors", function()
+      io_ctrl.install()
+      local real = io.open
+      ---@diagnostic disable-next-line: duplicate-set-field
+      io.open = function(path, mode)
+        if mode == nil or mode:find "r" then
+          return nil, path .. ": Permission denied"
+        end
+        return real(path, mode)
+      end
+
+      local store =
+        state.new { path = "/tmp/perm_denied.json", auto_load = false, async = false }
+      store:load()
+      local found_warn = false
+      for _, call in ipairs(wt._calls) do
+        if call.fn == "log_warn" and call.args[1]:find "unable to read" then
+          found_warn = true
+          break
+        end
+      end
+      assert.is_true(found_warn)
+      io.open = real
+      io_ctrl.install()
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- serde unavailable: save and load are no-ops
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("serde unavailable", function()
+    -- memo.state captures _has_serde at module load time, so we cannot
+    -- dynamically toggle it. However, we can verify that when serde IS
+    -- available, it is actually used (already tested above). This test
+    -- documents the contract: if serde were nil, save/load return early.
+    -- The module-level `_has_serde` is `wt.serde ~= nil`, always true
+    -- in our mock, so we test the next-best thing: json_encode returning
+    -- empty string still writes (it doesn't short-circuit).
+    it("save writes even when json_encode returns empty string", function()
+      local orig = wt.serde.json_encode
+      wt.serde.json_encode = function()
+        return ""
+      end
+      local path = "/tmp/empty_enc.json"
+      local store = state.new { path = path, auto_save = false, async = false }
+      store:set("k", "v")
+      store:save()
+      assert.are.equal("", io_ctrl.files[path])
+      wt.serde.json_encode = orig
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- restore: shallow copy leaks nested table references
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("restore shallow copy semantics", function()
+    it("nested table in copy is the same reference as internal", function()
+      local store = state.new { path = "/tmp/shallow.json", auto_save = false }
+      store:set("cfg", { theme = "dark" })
+      local copy = store:restore()
+      -- Shallow copy: top-level keys are copied, but nested tables are shared.
+      copy.cfg.theme = "light"
+      -- This modification leaks back into the store's internal data.
+      assert.are.equal("light", store:get("cfg").theme)
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- new: same path shares GLOBAL slot
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("same path shares GLOBAL slot", function()
+    it("two instances with same path see each other's mutations", function()
+      local path = "/tmp/shared.json"
+      local s1 = state.new { path = path, auto_save = false }
+      local s2 = state.new { path = path, auto_save = false }
+      s1:set("k", "from_s1")
+      assert.are.equal("from_s1", s2:get "k")
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- set: edge cases for value types
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("set value edge cases", function()
+    it("stores nil value (effectively deletes)", function()
+      local store = state.new { path = "/tmp/nil_val.json", auto_save = false }
+      store:set("k", "v")
+      store:set("k", nil)
+      -- In Lua, tbl["k"] = nil removes the key.
+      assert.is_nil(store:get "k")
+      assert.is_false(store:has "k")
+    end)
+
+    it("stores empty string key", function()
+      local store = state.new { path = "/tmp/empty_key.json", auto_save = false }
+      store:set("", "value")
+      assert.are.equal("value", store:get "")
+      assert.is_true(store:has "")
+    end)
+
+    it("stores boolean values", function()
+      local store = state.new { path = "/tmp/bools.json", auto_save = false }
+      store:set("flag_true", true)
+      store:set("flag_false", false)
+      assert.is_true(store:get "flag_true")
+      assert.is_false(store:get "flag_false")
+      -- has() treats false as non-nil, so has returns false for false value!
+      -- This documents the quirk: has("flag_false") = false because
+      -- `data[key] ~= nil` is `false ~= nil` which is true. Wait—
+      -- false ~= nil IS true, so has should return true.
+      assert.is_true(store:has "flag_false")
+    end)
+  end)
+
+  -- ─────────────────────────────────────────────────────────────────────
+  -- load replaces existing in-memory data
+  -- ─────────────────────────────────────────────────────────────────────
+
+  describe("load replaces in-memory data", function()
+    it("load wipes old data and replaces with file content", function()
+      local path = "/tmp/replace.json"
+      local store =
+      state.new { path = path, auto_save = false, auto_load = false, async = false }
+      store:set("inmemory", "old")
+
+      io_ctrl.files[path] = '{"ondisk":"new"}'
+      store:load()
+      -- Old data is gone; new data from disk is present.
+      assert.is_nil(store:get "inmemory")
+      assert.are.equal("new", store:get "ondisk")
+    end)
+  end)
 end)
