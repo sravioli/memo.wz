@@ -27,7 +27,7 @@ local function serialize(v, seen)
   if t == "string" then
     return sformat("%q", v)
   elseif t == "number" then
-    if math.type(v) == "integer" then
+    if v % 1 == 0 then
       return sformat("%d", v)
     end
     return sformat("%.17g", v)

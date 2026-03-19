@@ -6,10 +6,9 @@
 ---zero bookkeeping overhead.  Keys are generated via `memo.key` (serialized
 ---concatenation) so that complex arguments produce deterministic cache keys.
 
-local key = require "memo.key" ---@class memo.Key
 local wt = require "wezterm" ---@class Wezterm
 
-local make_cache_key = key.make_cache_key
+local make_cache_key = require("memo.key").make_cache_key
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- GLOBAL initialization
