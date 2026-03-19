@@ -9,7 +9,7 @@ Memoization, caching, and persistent state for
 
 - Session-scoped memoization cache backed by `wezterm.GLOBAL`
 - File-persistent key/value store with auto-load/save and async writes
-- XXH3-64 pure Lua 5.4 hashing (deterministic keys from any Lua value)
+- Deterministic key generation via serialization and concatenation
 - Configurable TTL, eviction policies, and hit/miss statistics
 - Namespaced cache partitions with scoped keys
 - `compute()` for automatic memoization of function results
@@ -51,7 +51,7 @@ The plugin exposes three sub-modules via its public API:
 ```lua
 local memo = wezterm.plugin.require "https://github.com/sravioli/memo.wz"
 memo.cache -- session-scoped memoization cache
-memo.hash  -- XXH3-64 hashing utilities
+memo.key   -- serialization and key generation utilities
 memo.state -- file-persistent key/value store factory
 ```
 
@@ -65,22 +65,22 @@ overhead.
 
 ```lua
 memo.cache.configure {
-  max_entries = 1000,           -- nil = unlimited
-  eviction    = "lru",          -- eviction policy
-  ttl         = { default = 60 }, -- TTL in seconds; nil = disabled
-  stats       = true,           -- track hit/miss/eviction counters
-  debug       = false,          -- log debug messages
+  max_entries = 1000,                -- nil = unlimited
+  eviction    = "expire-first",      -- eviction policy
+  ttl         = { default = 60 },    -- TTL in seconds; nil = disabled
+  stats       = true,                -- track hit/miss/eviction counters
+  debug       = false,               -- log debug messages
 }
 ```
 
-| Field         | Type            | Default   | Description                                |
-| ------------- | --------------- | --------- | ------------------------------------------ |
-| `max_entries` | integer?        | `nil`     | Max cache entries. `nil` = unlimited.      |
-| `eviction`    | string          | `"lru"`   | Eviction policy when limit reached.        |
-| `ttl`         | table?          | `nil`     | `{ default = N }` in seconds. `nil` = off. |
-| `stats`       | boolean         | `false`   | Track hit/miss/eviction statistics.        |
-| `debug`       | boolean         | `false`   | Log debug messages.                        |
-| `clock`       | `fun(): number` | `os.time` | Clock function for TTL (injectable).       |
+| Field         | Type            | Default          | Description                                |
+| ------------- | --------------- | ---------------- | ------------------------------------------ |
+| `max_entries` | integer?        | `nil`            | Max cache entries. `nil` = unlimited.      |
+| `eviction`    | string          | `"expire-first"` | Eviction policy when limit reached.        |
+| `ttl`         | table?          | `nil`            | `{ default = N }` in seconds. `nil` = off. |
+| `stats`       | boolean         | `false`          | Track hit/miss/eviction statistics.        |
+| `debug`       | boolean         | `false`          | Log debug messages.                        |
+| `clock`       | `fun(): number` | `os.time`        | Clock function for TTL (injectable).       |
 
 Pass `false` for `ttl` or `max_entries` to explicitly disable them.
 
@@ -120,23 +120,23 @@ ns.get("key") -- "value"
 All keys are automatically prefixed with `"my-plugin:"`. The namespace
 wrapper exposes the same API as `memo.cache` but scoped to the prefix.
 
-## Hash
+## Key
 
-XXH3-64 pure Lua 5.4 implementation and recursive value hasher. All
-arithmetic uses native 64-bit integers with bitwise operators.
+Deterministic cache-key generation via serialization and concatenation.
+Each Lua value is converted to an unambiguous string representation and
+the parts are joined with `|`. Tables are serialized recursively with
+sorted keys; cyclic references produce the sentinel `"<cycle>"`.
 
 ### Functions
 
-| Function                         | Description                                           |
-| -------------------------------- | ----------------------------------------------------- |
-| `hash.xxh3_64(input)`            | Hash a string, returns a 64-bit integer (signed i64). |
-| `hash.hash_any(value)`           | Recursively hash any Lua value (cycle-safe).          |
-| `hash.make_cache_key(name, ...)` | Generate a deterministic key from name + arguments.   |
+| Function                        | Description                                                       |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `key.serialize(value, seen?)`   | Serialize any Lua value into a deterministic string (cycle-safe). |
+| `key.make_cache_key(name, ...)` | Generate a deterministic key from name + arguments.               |
 
 ```lua
-memo.hash.xxh3_64("hello")                    -- integer
-memo.hash.hash_any({ nested = { 1, 2, 3 } }) -- integer
-memo.hash.make_cache_key("fn", "a", "b")      -- "fn|a|b"
+memo.key.serialize({ nested = { 1, 2, 3 } }) -- deterministic string
+memo.key.make_cache_key("fn", "a", "b")       -- "fn|a|b"
 ```
 
 ## State
