@@ -779,7 +779,7 @@ describe("memo.state", function()
     it("load wipes old data and replaces with file content", function()
       local path = "/tmp/replace.json"
       local store =
-      state.new { path = path, auto_save = false, auto_load = false, async = false }
+        state.new { path = path, auto_save = false, auto_load = false, async = false }
       store:set("inmemory", "old")
 
       io_ctrl.files[path] = '{"ondisk":"new"}'
