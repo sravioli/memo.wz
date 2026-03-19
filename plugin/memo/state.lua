@@ -7,12 +7,8 @@
 ---process (the "load guard") and optionally flushed after every mutation.
 
 local cache = require "memo.cache" ---@class memo.Cache
-local hash = require "memo.hash" ---@class memo.Hash
 local wt = require "wezterm" ---@class Wezterm
 
-local sformat = string.format
-
-local xxh3_64 = hash.xxh3_64
 local ensure_global_tbl = cache._ensure_global_tbl
 local sync_to_global = cache._sync_to_global
 
@@ -232,7 +228,7 @@ local M = {}
 function M.new(opts)
   assert(opts and opts.path, "[memo.state] opts.path is required")
 
-  local slot_key = sformat("__memo_state_%016x", xxh3_64(opts.path))
+  local slot_key = "__memo_state_" .. opts.path:gsub("[^%w_%-%.]", "_")
   local store = ensure_global_tbl(slot_key, { loaded = false, data = {} })
 
   return setmetatable({

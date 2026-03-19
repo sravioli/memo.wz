@@ -7,10 +7,10 @@
 
 ---@class memo.API
 ---@field cache memo.Cache  Session-scoped memoization cache (wezterm.GLOBAL).
----@field hash  memo.Hash   XXH3-64 hashing and key generation utilities.
+---@field key   memo.Key    Serialization and key generation utilities.
 ---@field state memo.State  File-persistent key/value store factory.
 return {
   cache = require "memo.cache",
-  hash = require "memo.hash",
+  key = require "memo.key",
   state = require "memo.state",
 }

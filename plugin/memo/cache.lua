@@ -3,14 +3,13 @@
 ---Session-scoped memoization cache backed by `wezterm.GLOBAL`.
 ---
 ---TTL and stats are opt-in; when disabled the cache stores bare values with
----zero bookkeeping overhead.  Keys are generated via `memo.hash` (XXH3-64)
----so that complex arguments produce compact, deterministic cache keys without
----the cost of building a full serialization string.
+---zero bookkeeping overhead.  Keys are generated via `memo.key` (serialized
+---concatenation) so that complex arguments produce deterministic cache keys.
 
-local hash = require "memo.hash" ---@class memo.Hash
+local key = require "memo.key" ---@class memo.Key
 local wt = require "wezterm" ---@class Wezterm
 
-local make_cache_key = hash.make_cache_key
+local make_cache_key = key.make_cache_key
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- GLOBAL initialization
