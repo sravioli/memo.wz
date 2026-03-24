@@ -480,16 +480,60 @@ describe("memo.cache", function()
   -- ─────────────────────────────────────────────────────────────────────
 
   describe("value overwrite", function()
-    it("set overwrites existing value", function()
+    it("set does not overwrite existing value without force", function()
       cache.set("k", "old")
       cache.set("k", "new")
-      assert.are.equal("new", cache.get "k")
+      assert.are.equal("old", cache.get "k")
     end)
 
-    it("set overwrites with different type", function()
+    it("set overwrites when force = true", function()
       cache.set("k", 42)
-      cache.set("k", "hello")
+      cache.set("k", "hello", { force = true })
       assert.are.equal("hello", cache.get "k")
+    end)
+
+    it("force=true overwrites existing entry and updates TTL", function()
+      local clock = 1000
+      cache.configure {
+        ttl = { default = 10 },
+        clock = function()
+          return clock
+        end,
+      }
+      -- initial write with long TTL
+      cache.set("k", "v1", { ttl = 20 })
+      -- force overwrite with shorter TTL
+      cache.set("k", "v1", { force = true, ttl = 5 })
+      clock = 1006 -- past the 5s TTL
+      assert.is_nil(cache.get "k")
+    end)
+
+    describe("set safeguard matrix", function()
+      it("missing key stores value", function()
+        cache.set("m1", "v")
+        assert.are.equal("v", cache.get "m1")
+      end)
+
+      it("missing key set to nil remains absent", function()
+        cache.set("m2", nil)
+        assert.is_false(cache.has "m2")
+        assert.is_nil(cache.get "m2")
+      end)
+
+      it("different value without force does not overwrite", function()
+        cache.set("k", "old")
+        cache.set("k", "new")
+        assert.are.equal("old", cache.get "k")
+      end)
+
+      it("namespace wrapper respects safeguard and force", function()
+        local ns = cache.namespace "saf"
+        ns.set("a", "x")
+        ns.set("a", "y")
+        assert.are.equal("x", ns.get "a")
+        ns.set("a", "y", { force = true })
+        assert.are.equal("y", ns.get "a")
+      end)
     end)
   end)
 
