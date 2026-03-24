@@ -310,6 +310,20 @@ function M.set(key, value, opts)
     )
     return
   end
+  -- Avoid unnecessary writes: if the key is present, do not overwrite it
+  -- unless the caller explicitly passes `opts = { force = true }`.
+  -- This matches `compute()` semantics (compute only on miss) and avoids
+  -- repeated writes during frequent reloads.
+  local _, hit = raw_get(key)
+  local force = opts and opts.force
+  local per_entry_ttl = ttl_enabled() and opts and opts.ttl ~= nil
+  -- Allow deletion via `set(key, nil)` and allow TTL-updates via per-entry
+  -- TTLs even when the key already exists. Otherwise do not overwrite
+  -- existing entries unless `force` is true.
+  if hit and not force and not per_entry_ttl and value ~= nil then
+    return
+  end
+
   maybe_evict()
   raw_set(key, value, opts)
 end
