@@ -353,8 +353,7 @@ describe("memo.state", function()
     end)
 
     it("handles missing file without error", function()
-      local store =
-        state.new { path = "/tmp/nonexistent.json", auto_load = false, async = false }
+      local store = state.new { path = "/tmp/nonexistent.json", auto_load = false, async = false }
       store:load()
       assert.is_nil(store:get "anything")
     end)
@@ -372,8 +371,7 @@ describe("memo.state", function()
         encode_called = true
         return orig(v)
       end
-      local store =
-        state.new { path = "/tmp/serde_enc.json", auto_save = false, async = false }
+      local store = state.new { path = "/tmp/serde_enc.json", auto_save = false, async = false }
       store:set("k", "v")
       store:save()
       assert.is_true(encode_called)
@@ -388,8 +386,7 @@ describe("memo.state", function()
         return orig(s)
       end
       io_ctrl.files["/tmp/serde_dec.json"] = '{"k":"v"}'
-      local store =
-        state.new { path = "/tmp/serde_dec.json", auto_load = false, async = false }
+      local store = state.new { path = "/tmp/serde_dec.json", auto_load = false, async = false }
       store:load()
       assert.is_true(decode_called)
       wt.serde.json_decode = orig
@@ -517,8 +514,7 @@ describe("memo.state", function()
         return orig_open(path, mode)
       end
 
-      local store =
-        state.new { path = "/tmp/write_fail.json", auto_save = false, async = false }
+      local store = state.new { path = "/tmp/write_fail.json", auto_save = false, async = false }
       store:set("k", "v")
       store:save()
 
@@ -664,8 +660,7 @@ describe("memo.state", function()
         return real(path, mode)
       end
 
-      local store =
-        state.new { path = "/tmp/perm_denied.json", auto_load = false, async = false }
+      local store = state.new { path = "/tmp/perm_denied.json", auto_load = false, async = false }
       store:load()
       local found_warn = false
       for _, call in ipairs(wt._calls) do
@@ -778,8 +773,7 @@ describe("memo.state", function()
   describe("load replaces in-memory data", function()
     it("load wipes old data and replaces with file content", function()
       local path = "/tmp/replace.json"
-      local store =
-        state.new { path = path, auto_save = false, auto_load = false, async = false }
+      local store = state.new { path = path, auto_save = false, auto_load = false, async = false }
       store:set("inmemory", "old")
 
       io_ctrl.files[path] = '{"ondisk":"new"}'
