@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.1](https://github.com/sravioli/memo.wz/compare/6ff714deb343a09c3a57662539772a30d85aca76..0.1.1) - 2026-04-02
+#### Bug Fixes
+- (**cache**) avoid repeated set calls - ([18bbfaf](https://github.com/sravioli/memo.wz/commit/18bbfafd9e7bfbb635654c1349edd9cdacf5f63d)) - sravioli
+- (**cocogitto**) set correct repository name - ([6ff714d](https://github.com/sravioli/memo.wz/commit/6ff714deb343a09c3a57662539772a30d85aca76)) - sravioli
+- streamline config files - ([3fc182c](https://github.com/sravioli/memo.wz/commit/3fc182ccf6e3288fe1601155d4c18ff66a51be3c)) - sravioli
+#### Tests
+- (**cache**) add set safeguard tests - ([72bad71](https://github.com/sravioli/memo.wz/commit/72bad7179e4cf9e2439e5be5068f285b2c28b8c0)) - sravioli
+#### Style
+- format with stylua - ([53c8c6f](https://github.com/sravioli/memo.wz/commit/53c8c6f0514561e0be6ea41c13dbe8b9e4770e88)) - sravioli
+
+- - -
+
 ## [0.1.0](https://github.com/sravioli/wezterm/compare/e312b69d8464de3ac9bd2b775ef5be7243f72cfe..0.1.0) - 2026-03-19
 #### Features
 - ![BREAKING](https://img.shields.io/badge/BREAKING-red) (**hash**) rm hash to use faster key serialization - ([8f622b9](https://github.com/sravioli/wezterm/commit/8f622b9e10642aceaef25bbfa3c25dfd4191ef1c)) - sravioli
