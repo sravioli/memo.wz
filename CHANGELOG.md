@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.2](https://github.com/sravioli/memo.wz/compare/e4d981d8b807e1a24050cd6e35ca41cc2f22a347..0.1.2) - 2026-04-10
+#### Documentation
+- add type annotations section to README - ([e4d981d](https://github.com/sravioli/memo.wz/commit/e4d981d8b807e1a24050cd6e35ca41cc2f22a347)) - sravioli
+
+- - -
+
 ## [0.1.1](https://github.com/sravioli/memo.wz/compare/6ff714deb343a09c3a57662539772a30d85aca76..0.1.1) - 2026-04-02
 #### Bug Fixes
 - (**cache**) avoid repeated set calls - ([18bbfaf](https://github.com/sravioli/memo.wz/commit/18bbfafd9e7bfbb635654c1349edd9cdacf5f63d)) - sravioli
