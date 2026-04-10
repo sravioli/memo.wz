@@ -1,5 +1,6 @@
 # memo.wz
 
+[![Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/michaelbrusegard/awesome-wezterm)
 [![Tests](https://img.shields.io/github/actions/workflow/status/sravioli/memo.wz/tests.yaml?label=Tests&logo=Lua)](https://github.com/sravioli/memo.wz/actions?workflow=tests)
 [![Lint](https://img.shields.io/github/actions/workflow/status/sravioli/memo.wz/lint.yaml?label=Lint&logo=Lua)](https://github.com/sravioli/memo.wz/actions?workflow=lint)
 [![Coverage](https://img.shields.io/coverallsCoverage/github/sravioli/memo.wz?label=Coverage&logo=coveralls)](https://coveralls.io/github/sravioli/memo.wz)
@@ -24,6 +25,17 @@ local memo = wezterm.plugin.require "https://github.com/sravioli/memo.wz"
 
 -- from a local checkout
 local memo = wezterm.plugin.require("file:///" .. wezterm.config_dir .. "/plugins/memo.wz")
+```
+
+### Type annotations
+
+Full LuaCATS type annotations are available via
+[wezterm-types](https://github.com/DrKJeff16/wezterm-types). After installing
+the types, annotate the import to get autocompletion and type checking:
+
+```lua
+---@type Memo
+local memo = wezterm.plugin.require "https://github.com/sravioli/memo.wz"
 ```
 
 ## Usage
