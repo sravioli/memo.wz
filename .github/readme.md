@@ -5,15 +5,15 @@
 [![Lint](https://img.shields.io/github/actions/workflow/status/sravioli/memo.wz/lint.yaml?label=Lint&logo=Lua)](https://github.com/sravioli/memo.wz/actions?workflow=lint)
 [![Coverage](https://img.shields.io/coverallsCoverage/github/sravioli/memo.wz?label=Coverage&logo=coveralls)](https://coveralls.io/github/sravioli/memo.wz)
 
-Memoization, caching, and persistent state for
+Memoization, caching, and persisted state for
 [WezTerm](https://wezfurlong.org/wezterm/) plugins and configuration code.
 
-- Session-scoped memoization cache backed by `wezterm.GLOBAL`
-- File-persistent key/value store with auto-load/save and async writes
+- Session cache backed by `wezterm.GLOBAL`
+- JSON key/value store with lazy loading, auto-save, and async writes
 - Deterministic key generation via serialization and concatenation
 - Configurable TTL, eviction policies, and hit/miss statistics
 - Namespaced cache partitions with scoped keys
-- `compute()` for automatic memoization of function results
+- `compute()` for memoizing function results
 
 ## Installation
 
@@ -29,9 +29,9 @@ local memo = wezterm.plugin.require("file:///" .. wezterm.config_dir .. "/plugin
 
 ### Type annotations
 
-Full LuaCATS type annotations are available via
-[wezterm-types](https://github.com/DrKJeff16/wezterm-types). After installing
-the types, annotate the import to get autocompletion and type checking:
+The modules include LuaCATS annotations. After installing
+[wezterm-types](https://github.com/DrKJeff16/wezterm-types), annotate the import
+to get autocompletion and type checking:
 
 ```lua
 ---@type Memo
@@ -58,7 +58,7 @@ store:get("last_workspace") -- "dev"
 
 ## Modules
 
-The plugin exposes three sub-modules via its public API:
+The public API exposes three modules:
 
 ```lua
 local memo = wezterm.plugin.require "https://github.com/sravioli/memo.wz"
@@ -69,9 +69,9 @@ memo.state -- file-persistent key/value store factory
 
 ## Cache
 
-Session-scoped memoization cache backed by `wezterm.GLOBAL`. TTL and stats
-are opt-in; when disabled the cache stores bare values with zero bookkeeping
-overhead.
+The cache stores values in `wezterm.GLOBAL`, so entries live for the current
+WezTerm process. TTL and stats are opt-in. When both are disabled, the cache
+stores bare values with almost no bookkeeping.
 
 ### Configuration
 
@@ -94,7 +94,8 @@ memo.cache.configure {
 | `debug`       | boolean         | `false`          | Log debug messages.                        |
 | `clock`       | `fun(): number` | `os.time`        | Clock function for TTL (injectable).       |
 
-Pass `false` for `ttl` or `max_entries` to explicitly disable them.
+Pass `false` for `ttl` or `max_entries` when you want to disable them
+explicitly.
 
 ### Methods
 
@@ -129,15 +130,15 @@ ns.set("key", "value")
 ns.get("key") -- "value"
 ```
 
-All keys are automatically prefixed with `"my-plugin:"`. The namespace
-wrapper exposes the same API as `memo.cache` but scoped to the prefix.
+All keys are prefixed with `"my-plugin:"`. The namespace wrapper exposes the
+same API as `memo.cache`, scoped to that prefix.
 
 ## Key
 
-Deterministic cache-key generation via serialization and concatenation.
-Each Lua value is converted to an unambiguous string representation and
-the parts are joined with `|`. Tables are serialized recursively with
-sorted keys; cyclic references produce the sentinel `"<cycle>"`.
+The key module turns Lua values into stable cache keys. Each value is serialized
+to an unambiguous string, and the parts are joined with `|`. Tables are
+serialized recursively with sorted keys. Cyclic references produce the sentinel
+`"<cycle>"`.
 
 ### Functions
 
@@ -153,9 +154,9 @@ memo.key.make_cache_key("fn", "a", "b")       -- "fn|a|b"
 
 ## State
 
-File-persistent key/value store backed by `wezterm.GLOBAL`. Each instance
-owns a dedicated GLOBAL slot and an on-disk JSON file. Data is loaded from
-disk once per WezTerm process and optionally flushed after every mutation.
+The state store keeps a JSON file on disk and mirrors it in `wezterm.GLOBAL`.
+Each store instance owns its own GLOBAL slot. Data is loaded once per WezTerm
+process and can be flushed after every mutation.
 
 ### Factory
 
