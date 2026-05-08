@@ -6,7 +6,7 @@
 [![Coverage](https://img.shields.io/coverallsCoverage/github/sravioli/memo.wz?label=Coverage&logo=coveralls)](https://coveralls.io/github/sravioli/memo.wz)
 
 Memoization, caching, and persisted state for
-[WezTerm](https://wezfurlong.org/wezterm/) plugins and configuration code.
+[WezTerm](https://wezfurlong.org/wezterm/) plugins and configs.
 
 - Session cache backed by `wezterm.GLOBAL`
 - JSON key/value store with lazy loading, auto-save, and async writes
@@ -29,9 +29,9 @@ local memo = wezterm.plugin.require("file:///" .. wezterm.config_dir .. "/plugin
 
 ### Type annotations
 
-The modules include LuaCATS annotations. After installing
+Memo ships LuaCATS annotations. After installing
 [wezterm-types](https://github.com/DrKJeff16/wezterm-types), annotate the import
-to get autocompletion and type checking:
+to get completion and type checking:
 
 ```lua
 ---@type Memo
@@ -58,7 +58,7 @@ store:get("last_workspace") -- "dev"
 
 ## Modules
 
-The public API exposes three modules:
+The public API has three modules:
 
 ```lua
 local memo = wezterm.plugin.require "https://github.com/sravioli/memo.wz"
@@ -119,8 +119,8 @@ explicitly.
 
 `clear` and `keys` accept an optional selector table:
 
-- `{ prefix = "foo" }` — match keys starting with `"foo"`.
-- `{ older_than = N }` — match entries older than N seconds (TTL mode).
+- `{ prefix = "foo" }`: match keys starting with `"foo"`.
+- `{ older_than = N }`: match entries older than N seconds (TTL mode).
 
 ### Namespaces
 
@@ -171,7 +171,7 @@ local store = memo.state.new {
 
 | Option      | Type    | Default | Description                                   |
 | ----------- | ------- | ------- | --------------------------------------------- |
-| `path`      | string  | —       | Absolute path to the JSON file. **Required.** |
+| `path`      | string  | nil     | Absolute path to the JSON file. Required.     |
 | `auto_load` | boolean | `true`  | Load from disk on first access.               |
 | `auto_save` | boolean | `true`  | Write to disk on every mutation.              |
 | `async`     | boolean | `true`  | Use `wezterm.background_task` when available. |
@@ -221,5 +221,6 @@ store:get("window_count") -- 3
 
 ## License
 
-Code is licensed under the [GNU General Public License v2](../LICENSE). Documentation
-is licensed under [Creative Commons Attribution-NonCommercial 4.0 International](../LICENSE-DOCS).
+Code is licensed under the [GNU General Public License v2](../LICENSE).
+Documentation is licensed under
+[Creative Commons Attribution-NonCommercial 4.0 International](../LICENSE-DOCS).
