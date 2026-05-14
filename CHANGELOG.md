@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.3](https://github.com/sravioli/memo.wz/compare/183280cc338d1bc0217b825243cab0baed970e94..0.1.3) - 2026-05-14
+#### Documentation
+- (**github**) add pull request templates - ([0438c7a](https://github.com/sravioli/memo.wz/commit/0438c7a6a4c8e815c43ddcc1a02908a5aa83fd2a)) - sravioli
+- (**github**) polish issue templates - ([3083161](https://github.com/sravioli/memo.wz/commit/3083161a0c7341b9475fdff1c669db0b91c770c1)) - sravioli
+- (**lua**) polish comment wording - ([cc43299](https://github.com/sravioli/memo.wz/commit/cc43299933d6a5c749011363c3dd0af5d2f04990)) - sravioli
+- (**lua**) polish comment wording - ([fcbdf6f](https://github.com/sravioli/memo.wz/commit/fcbdf6fa2bce345eeec7223ada8979b2e8e6f345)) - sravioli
+- (**readme**) improve readme consistency - ([da6d0d5](https://github.com/sravioli/memo.wz/commit/da6d0d5c759b6024964e5d386ee5bf6464fe88ea)) - sravioli
+- (**readme**) improve readme clarity - ([183280c](https://github.com/sravioli/memo.wz/commit/183280cc338d1bc0217b825243cab0baed970e94)) - sravioli
+
+- - -
+
 ## [0.1.2](https://github.com/sravioli/memo.wz/compare/e4d981d8b807e1a24050cd6e35ca41cc2f22a347..0.1.2) - 2026-04-10
 #### Documentation
 - add type annotations section to README - ([e4d981d](https://github.com/sravioli/memo.wz/commit/e4d981d8b807e1a24050cd6e35ca41cc2f22a347)) - sravioli
