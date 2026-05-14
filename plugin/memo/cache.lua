@@ -3,7 +3,7 @@
 ---Session-scoped memoization cache backed by `wezterm.GLOBAL`.
 ---
 ---TTL and stats are opt-in; when disabled the cache stores bare values with
----zero bookkeeping overhead.  Keys are generated via `memo.key` (serialized
+---zero bookkeeping overhead. Keys are generated via `memo.key` (serialized
 ---concatenation) so that complex arguments produce deterministic cache keys.
 
 local wt = require "wezterm" ---@class Wezterm
@@ -296,7 +296,7 @@ end
 
 ---Store a value in the cache.
 ---
----Functions cannot be stored in `wezterm.GLOBAL`.  Attempting to store a
+---Functions cannot be stored in `wezterm.GLOBAL`. Attempting to store a
 ---function logs an error and returns without writing.
 ---
 ---@param key   string     Cache key.
@@ -346,9 +346,9 @@ end
 
 ---Clear cache entries.
 ---
----Without arguments, clears the entire cache.  With a selector table:
----- `{ prefix = "foo" }` — delete all keys starting with `"foo"`.
----- `{ older_than = N }` — delete entries older than N seconds (TTL mode).
+---Without arguments, clears the entire cache. With a selector table:
+--- - `{ prefix = "foo" }`: delete all keys starting with `"foo"`.
+--- - `{ older_than = N }`: delete entries older than N seconds in TTL mode.
 ---
 ---@param selector table|nil
 function M.clear(selector)

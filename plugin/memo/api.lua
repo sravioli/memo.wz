@@ -3,7 +3,7 @@
 ---Public API for memo.wz.
 ---
 ---`plugin/init.lua` requires this module after bootstrapping `package.path`.
----The two sub-tables — `cache` and `state` — are the entire public surface.
+---The `cache`, `key`, and `state` sub-tables make up the public surface.
 
 ---@class memo.API
 ---@field cache memo.Cache  Session-scoped memoization cache (wezterm.GLOBAL).

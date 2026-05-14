@@ -2,8 +2,8 @@
 
 ---File-persistent key/value store backed by `wezterm.GLOBAL`.
 ---
----Each instance owns a dedicated GLOBAL slot (keyed by the file path hash)
----and an on-disk JSON file.  Data is loaded from disk once per WezTerm
+---Each instance owns a dedicated GLOBAL slot, keyed by the file path hash,
+---and an on-disk JSON file. Data is loaded from disk once per WezTerm
 ---process (the "load guard") and optionally flushed after every mutation.
 
 local cache = require "memo.cache" ---@class memo.Cache
@@ -47,7 +47,7 @@ end
 local Store = {}
 Store.__index = Store
 
----Ensure state has been loaded from disk (respects auto_load and load guard).
+---Load state from disk when needed, respecting `auto_load` and the load guard.
 ---@param self memo.state.Store
 local function ensure_loaded(self)
   if self._store.loaded then
@@ -81,7 +81,7 @@ end
 
 ---Store a value.
 ---
----Keys must be strings (JSON limitation).  Functions cannot be persisted.
+---Keys must be strings because JSON object keys are strings. Functions cannot be persisted.
 ---
 ---@param key   string
 ---@param value any
@@ -169,7 +169,7 @@ function Store:load()
   end
 
   if type(decoded) == "table" then
-    -- Wipe existing data, then deep-copy decoded values.
+    -- Replace existing data, then deep-copy decoded values.
     for k in pairs(self._store.data) do
       self._store.data[k] = nil
     end
@@ -223,7 +223,7 @@ local M = {}
 ---  - `path`      (string, required)  Absolute path to the JSON file.
 ---  - `auto_load` (boolean, default true)  Load from disk on first access.
 ---  - `auto_save` (boolean, default true)  Write to disk on every mutation.
----  - `async`     (boolean, default true)  Use background_task when available.
+---  - `async`     (boolean, default true)  Use `background_task` when available.
 ---@return memo.state.Store
 function M.new(opts)
   assert(opts and opts.path, "[memo.state] opts.path is required")

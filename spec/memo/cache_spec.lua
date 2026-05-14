@@ -343,7 +343,7 @@ describe("memo.cache", function()
       cache.configure { max_entries = 2 }
       cache.set("a", 1)
       cache.set("b", 2)
-      cache.set("c", 3) -- should evict one of a/b
+      cache.set("c", 3) -- Evicts one of a/b.
       local ks = cache.keys()
       assert.are.equal(2, #ks)
       assert.are.equal(3, cache.get "c") -- newest survives
@@ -391,7 +391,7 @@ describe("memo.cache", function()
   describe("configure", function()
     it("is a no-op when called with nil", function()
       cache.configure(nil)
-      -- Should not error; config remains default.
+      -- No error; config remains at the default.
       cache.set("k", "v")
       assert.are.equal("v", cache.get "k")
     end)
@@ -720,8 +720,7 @@ describe("memo.cache", function()
       cache.set("ns:new", "y")
       cache.set("other:old_ish", "z") -- created at 1050
       clock = 1000 -- reset so "other:old_ish" appears old (created at 1050)
-      -- Wait — we need a key that IS old for older_than.
-      -- Let's reset and build a cleaner scenario.
+      -- Reset and build a cleaner scenario with one genuinely old key.
       cache.clear()
       clock = 1000
       cache.set("ns:a", 1)
@@ -807,8 +806,8 @@ describe("memo.cache", function()
       cache.set("k", nil)
       -- { value = nil, expires_at = 1010 } is stored, but raw_get still
       -- finds the entry (it's a non-nil table). Let's see the actual behavior.
-      -- If the TTL wrapper itself is stored, has should be true.
-      -- This documents actual semantics.
+      -- If the TTL wrapper itself is stored, `has` returns true.
+      -- This documents the current semantics.
       local has = cache.has "k"
       if has then
         -- TTL wrapping means the entry exists as a table { value=nil, expires_at=... }
@@ -936,7 +935,7 @@ describe("memo.cache", function()
     it("recreates slot if externally deleted between operations", function()
       cache.set("k", "v")
       wt.GLOBAL.__memo_cache = nil -- simulate external wipe
-      -- Should not crash; slot is recreated lazily.
+      -- Does not crash; the slot is recreated lazily.
       cache.set("k2", "v2")
       assert.are.equal("v2", cache.get "k2")
     end)
@@ -952,7 +951,7 @@ describe("memo.cache", function()
       cache.set("k", "v")
       cache.get "k" -- bump hits; stats slot exists
       wt.GLOBAL.__memo_stats = nil -- nuke it
-      cache.get "k" -- bump should lazily recreate the slot
+      cache.get "k" -- Bump lazily recreates the stats slot.
       local st = cache.stats()
       -- After slot recreation, only the most recent hit is tracked.
       assert.are.equal(1, st.hits)

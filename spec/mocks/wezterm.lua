@@ -79,7 +79,7 @@ M.time = {
 local sep = package.config:sub(1, 1)
 M.config_dir = sep == "\\" and "C:\\wezterm_mock_config_dir" or "/wezterm_mock_config_dir"
 
--- wezterm.GLOBAL stub — survives config reloads, wiped on process exit.
+-- wezterm.GLOBAL stub: survives config reloads, wiped on process exit.
 M.GLOBAL = {}
 
 -- wezterm.plugin stub

@@ -111,7 +111,7 @@ describe("memo.state (serde unavailable)", function()
     local store = state.new { path = path, auto_save = false, async = false }
     store:set("k", "v")
     store:save()
-    -- No file should have been written since serde is nil.
+    -- No file is written because serde is nil.
     assert.is_nil(io_ctrl.files[path])
   end)
 
@@ -122,9 +122,9 @@ describe("memo.state (serde unavailable)", function()
     local open_calls_before = io_ctrl.open_calls
     local store = state.new { path = path, auto_load = false, async = false }
     store:load()
-    -- Data should NOT have been loaded from disk.
+    -- Data is not loaded from disk.
     assert.is_nil(store:get "k")
-    -- io.open should not have been called (early return before io.open).
+    -- io.open is not called because load returns early.
     assert.are.equal(open_calls_before, io_ctrl.open_calls)
   end)
 end)
@@ -170,14 +170,14 @@ describe("memo.state (background_task available)", function()
     store:set("k", "v")
     store:save()
 
-    -- File should NOT yet be written (queued in background_task).
+    -- The file is not written yet because the write is queued in background_task.
     assert.is_nil(io_ctrl.files[path])
-    -- A background task should have been scheduled.
+    -- A background task is scheduled.
     assert.are.equal(1, #bg_tasks)
 
     -- Execute the background task.
     bg_tasks[1]()
-    -- Now the file should be written.
+    -- The queued write now reaches disk.
     assert.is_not_nil(io_ctrl.files[path])
   end)
 
@@ -188,9 +188,9 @@ describe("memo.state (background_task available)", function()
     store:set("k", "v")
     store:save()
 
-    -- File should be written immediately (sync path because async=false).
+    -- The file is written immediately on the sync path because async=false.
     assert.is_not_nil(io_ctrl.files[path])
-    -- No background task should have been scheduled.
+    -- No background task is scheduled.
     assert.are.equal(0, #bg_tasks)
   end)
 end)

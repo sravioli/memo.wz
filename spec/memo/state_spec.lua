@@ -77,10 +77,10 @@ describe("memo.state", function()
     io_ctrl = stub_io()
     io_ctrl.install()
 
-    -- Provide a working json_decode mock (no code execution).
+    -- Install a working json_decode mock with no code execution.
     wt.serde.json_decode = function(s)
       local result = {}
-      -- Match "key":"value" pairs (string values only — sufficient for tests).
+      -- Match "key":"value" pairs. String values are enough for these tests.
       for k, v in s:gmatch '"([%w_]+)"%s*:%s*"([^"]*)"' do
         result[k] = v
       end
@@ -232,7 +232,7 @@ describe("memo.state", function()
       -- First access triggers auto_load.
       store:get "k"
       local calls_after_first = io_ctrl.open_calls
-      -- Subsequent accesses should not re-read.
+      -- Later accesses do not re-read.
       store:get "k"
       store:get "k"
       assert.are.equal(calls_after_first, io_ctrl.open_calls)
@@ -327,7 +327,7 @@ describe("memo.state", function()
       io_ctrl.files[path] = ""
       local store = state.new { path = path, auto_load = false, async = false }
       store:load()
-      -- Should not error; store stays empty.
+      -- No error; the store stays empty.
       assert.is_nil(store:get "anything")
     end)
 
@@ -335,7 +335,7 @@ describe("memo.state", function()
       local path = "/tmp/bad.json"
       io_ctrl.files[path] = "not valid json {{{"
       local store = state.new { path = path, auto_load = false, async = false }
-      -- json_decode will error; load should catch it and log a warning.
+      -- json_decode errors; load catches it and logs a warning.
       wt.serde.json_decode = function(s)
         error("invalid JSON: " .. s)
       end
@@ -461,7 +461,7 @@ describe("memo.state", function()
     it("rejects numeric keys with an error log", function()
       local store = state.new { path = "/tmp/numkey.json", auto_save = false }
       store:set(42, "value")
-      -- The value should not have been stored.
+      -- The value was not stored.
       assert.is_nil(store:get "42")
       -- Verify an error was logged.
       local found_err = false
@@ -501,7 +501,7 @@ describe("memo.state", function()
         if mode and mode:find "w" then
           return nil, path .. ": Permission denied"
         end
-        return io_ctrl.install() -- shouldn't happen, but fall through
+        return io_ctrl.install() -- Unexpected path; fall through safely.
       end
       -- Re-install the stub but override write mode.
       io_ctrl.install()
@@ -539,7 +539,7 @@ describe("memo.state", function()
   describe("delete edge cases", function()
     it("delete on non-existent key is a no-op", function()
       local store = state.new { path = "/tmp/del_noop.json", auto_save = false }
-      -- Should not error.
+      -- No error.
       store:delete "nonexistent"
       assert.is_nil(store:get "nonexistent")
     end)
@@ -556,7 +556,7 @@ describe("memo.state", function()
   describe("clear edge cases", function()
     it("clear on empty store is a no-op", function()
       local store = state.new { path = "/tmp/clear_empty.json", auto_save = false }
-      -- Should not error.
+      -- No error.
       store:clear()
       assert.are.same({}, store:restore())
     end)
@@ -571,7 +571,7 @@ describe("memo.state", function()
       local path = "/tmp/autoload_has.json"
       io_ctrl.files[path] = '{"k":"loaded"}'
       local store = state.new { path = path, auto_save = false, async = false }
-      -- First call to has should trigger auto_load.
+      -- The first has() call triggers auto_load.
       assert.is_true(store:has "k")
     end)
 
@@ -580,7 +580,7 @@ describe("memo.state", function()
       io_ctrl.files[path] = '{"k":"loaded"}'
       local store = state.new { path = path, auto_save = false, async = false }
       store:delete "k"
-      -- After auto_load + delete, key should be gone.
+      -- After auto_load and delete, the key is gone.
       assert.is_false(store:has "k")
     end)
 
@@ -639,7 +639,7 @@ describe("memo.state", function()
       end
       local store = state.new { path = path, auto_load = false, async = false }
       store:load()
-      -- Store should remain empty (non-table decoded result ignored).
+      -- The store remains empty because non-table decoded results are ignored.
       assert.are.same({}, store:restore())
     end)
   end)
@@ -759,9 +759,7 @@ describe("memo.state", function()
       assert.is_true(store:get "flag_true")
       assert.is_false(store:get "flag_false")
       -- has() treats false as non-nil, so has returns false for false value!
-      -- This documents the quirk: has("flag_false") = false because
-      -- `data[key] ~= nil` is `false ~= nil` which is true. Wait—
-      -- false ~= nil IS true, so has should return true.
+      -- This documents the quirk: `false ~= nil`, so has() returns true.
       assert.is_true(store:has "flag_false")
     end)
   end)
