@@ -117,16 +117,32 @@ local function ttl_enabled()
 end
 
 ---Get the effective TTL for an entry, respecting per-entry override.
+---
+---A per-entry `opts.ttl` applies even when TTL is disabled globally.
 ---@param opts table|nil  Per-call options `{ ttl = N }`.
----@return number|nil     TTL in seconds, or nil if TTL is disabled.
+---@return number|nil     TTL in seconds, or nil if no TTL applies.
 local function effective_ttl(opts)
-  if not ttl_enabled() then
-    return nil
-  end
   if opts and opts.ttl then
     return opts.ttl
   end
+  if not ttl_enabled() then
+    return nil
+  end
   return _cfg.ttl and _cfg.ttl.default
+end
+
+---Whether `entry` is a TTL wrapper that should be unwrapped.
+---
+---With TTL enabled any `{ expires_at }` table is a wrapper (legacy shape);
+---otherwise only wrappers tagged by `raw_set` count, so user tables that
+---happen to carry an `expires_at` field are returned untouched.
+---@param entry any
+---@return boolean
+local function is_wrapper(entry)
+  if type(entry) ~= "table" or entry.expires_at == nil then
+    return false
+  end
+  return ttl_enabled() or entry.__memo_ttl == true
 end
 
 ---Bump stats counters.
@@ -164,12 +180,8 @@ local function raw_get(key)
     return nil, false
   end
 
-  if not ttl_enabled() then
-    return entry, true
-  end
-
   -- TTL-wrapped entry: { value = ..., expires_at = ... }
-  if type(entry) == "table" and entry.expires_at ~= nil then
+  if is_wrapper(entry) then
     if is_expired(entry) then
       slot[key] = nil
       bump "evictions"
@@ -178,7 +190,7 @@ local function raw_get(key)
     return entry.value, true
   end
 
-  -- Legacy bare value (set before TTL was enabled).
+  -- Bare value (TTL disabled, or set before TTL was enabled).
   return entry, true
 end
 
@@ -190,7 +202,7 @@ local function raw_set(key, value, opts)
   local slot = SLOT()
   local ttl = effective_ttl(opts)
   if ttl then
-    slot[key] = { value = value, expires_at = _cfg.clock() + ttl }
+    slot[key] = { value = value, expires_at = _cfg.clock() + ttl, __memo_ttl = true }
   else
     slot[key] = value
   end
@@ -316,7 +328,7 @@ function M.set(key, value, opts)
   -- repeated writes during frequent reloads.
   local _, hit = raw_get(key)
   local force = opts and opts.force
-  local per_entry_ttl = ttl_enabled() and opts and opts.ttl ~= nil
+  local per_entry_ttl = opts and opts.ttl ~= nil
   -- Allow deletion via `set(key, nil)` and allow TTL-updates via per-entry
   -- TTLs even when the key already exists. Otherwise do not overwrite
   -- existing entries unless `force` is true.
@@ -386,29 +398,23 @@ end
 
 ---Mark a key as expired immediately.
 ---
----No-op when TTL is disabled.
+---No-op for entries stored without a TTL.
 ---
 ---@param key string  Cache key.
 function M.expire(key)
-  if not ttl_enabled() then
-    return
-  end
   local entry = SLOT()[key]
-  if type(entry) == "table" and entry.expires_at ~= nil then
+  if is_wrapper(entry) then
     entry.expires_at = 0
   end
 end
 
 ---Check whether a cached entry is still fresh.
 ---
----Always returns `true` when TTL is disabled (entries never expire).
+---Entries stored without a TTL never expire.
 ---
 ---@param key string  Cache key.
 ---@return boolean
 function M.is_fresh(key)
-  if not ttl_enabled() then
-    return SLOT()[key] ~= nil
-  end
   local _, hit = raw_get(key)
   return hit
 end
@@ -455,6 +461,86 @@ function M.compute(name, fn, ...)
   maybe_evict()
   raw_set(key, res)
   return res
+end
+
+---Deep-copy a value into plain Lua tables.
+---
+---Values read from `wezterm.GLOBAL` are userdata proxies: they cannot be
+---mutated freely, passed to `table.*` helpers or compared by identity. This
+---turns them (and nested tables) into ordinary tables; scalars pass through.
+---
+---@param v any
+---@return any
+function M.plain(v)
+  local tv = type(v)
+  if tv ~= "table" and tv ~= "userdata" then
+    return v
+  end
+  local ok, iter, s, init = pcall(pairs, v)
+  if not ok then
+    return v
+  end
+  local out = {}
+  for k, val in iter, s, init do
+    out[k] = M.plain(val)
+  end
+  return out
+end
+
+---Read-through cache with an exact key.
+---
+---Returns the cached value for `key` when fresh; otherwise calls `fn()`,
+---stores a non-nil result (overwriting any stale entry) and returns it.
+---Errors from `fn` propagate and nothing is cached.
+---
+---Options:
+--- - `ttl`   seconds the entry stays fresh; `0` bypasses the cache entirely.
+---           Defaults to the global TTL, or no expiry when TTL is disabled.
+--- - `plain` return a plain-table copy (see `plain`) instead of the raw
+---           GLOBAL-backed value; applies to both hits and fresh results.
+---
+---@param key  string
+---@param fn   fun(): any
+---@param opts { ttl?: number, plain?: boolean }|nil
+---@return any
+function M.fetch(key, fn, opts)
+  local ttl = opts and opts.ttl
+  local as_plain = opts and opts.plain
+  if ttl == 0 then
+    local res = fn()
+    return as_plain and M.plain(res) or res
+  end
+  local value, hit = raw_get(key)
+  if hit then
+    bump "hits"
+    return as_plain and M.plain(value) or value
+  end
+  bump "misses"
+  local res = fn()
+  if res ~= nil and type(res) ~= "function" then
+    maybe_evict()
+    raw_set(key, res, ttl and { ttl = ttl } or nil)
+  end
+  return as_plain and M.plain(res) or res
+end
+
+---`compute` with per-call options.
+---
+---Same argument-derived key as `compute(name, fn, ...)`, but accepts the
+---options of `fetch` (`ttl`, `plain`). Unlike `compute`, nil results are not
+---cached, so a failed lookup is retried on the next call.
+---
+---@param name string
+---@param opts { ttl?: number, plain?: boolean }|nil
+---@param fn   fun(...: any): any
+---@param ...  any
+---@return any
+function M.compute_with(name, opts, fn, ...)
+  local n, args = select("#", ...), { ... }
+  local unpack_ = rawget(table, "unpack") or unpack ---@diagnostic disable-line: deprecated
+  return M.fetch(make_cache_key(name, ...), function()
+    return fn(unpack_(args, 1, n))
+  end, opts)
 end
 
 ---Return all cache keys, optionally filtered.
@@ -522,6 +608,14 @@ function M.namespace(name)
 
   function ns.compute(ns_name, fn, ...)
     return M.compute(prefix .. ns_name, fn, ...)
+  end
+
+  function ns.compute_with(ns_name, opts, fn, ...)
+    return M.compute_with(prefix .. ns_name, opts, fn, ...)
+  end
+
+  function ns.fetch(key, fn, opts)
+    return M.fetch(prefix .. key, fn, opts)
   end
 
   function ns.expire(key)

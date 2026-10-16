@@ -99,21 +99,35 @@ explicitly.
 
 ### Methods
 
-| Method                         | Description                                           |
-| ------------------------------ | ----------------------------------------------------- |
-| `cache.get(key)`               | Retrieve a cached value.                              |
-| `cache.set(key, value, opts?)` | Store a value. Optional `{ ttl = N }` per-call TTL.   |
-| `cache.has(key)`               | Check whether a key exists and is fresh.              |
-| `cache.delete(key)`            | Delete a single entry.                                |
-| `cache.clear(selector?)`       | Clear all or filtered entries.                        |
-| `cache.expire(key)`            | Mark a key as expired immediately (TTL mode).         |
-| `cache.is_fresh(key)`          | Check whether an entry is still fresh.                |
-| `cache.touch(key)`             | Reset the TTL on an existing key.                     |
-| `cache.compute(name, fn, ...)` | Memoize: cache `fn(...)` result under a derived key.  |
-| `cache.keys(selector?)`        | Return all cache keys, optionally filtered by prefix. |
-| `cache.stats()`                | Return `{ hits, misses, evictions, entries }`.        |
-| `cache.namespace(name)`        | Create a prefixed cache partition.                    |
-| `cache.configure(opts)`        | Merge options into the current configuration.         |
+| Method                                   | Description                                                 |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| `cache.get(key)`                         | Retrieve a cached value.                                    |
+| `cache.set(key, value, opts?)`           | Store a value. Optional `{ ttl = N }` per-call TTL.         |
+| `cache.has(key)`                         | Check whether a key exists and is fresh.                    |
+| `cache.delete(key)`                      | Delete a single entry.                                      |
+| `cache.clear(selector?)`                 | Clear all or filtered entries.                              |
+| `cache.expire(key)`                      | Mark a TTL entry as expired immediately.                    |
+| `cache.is_fresh(key)`                    | Check whether an entry is still fresh.                      |
+| `cache.touch(key)`                       | Reset the TTL on an existing key.                           |
+| `cache.compute(name, fn, ...)`           | Memoize: cache `fn(...)` result under a derived key.        |
+| `cache.compute_with(name, opts, fn, ...)` | Like `compute`, with `{ ttl?, plain? }` options.           |
+| `cache.fetch(key, fn, opts?)`            | Read-through: return `key` or cache `fn()`. `{ ttl?, plain? }`. |
+| `cache.plain(value)`                     | Deep-copy a GLOBAL-backed value into plain Lua tables.      |
+| `cache.keys(selector?)`                  | Return all cache keys, optionally filtered by prefix.       |
+| `cache.stats()`                          | Return `{ hits, misses, evictions, entries }`.              |
+| `cache.namespace(name)`                  | Create a prefixed cache partition.                          |
+| `cache.configure(opts)`                  | Merge options into the current configuration.               |
+
+A per-call `{ ttl = N }` applies even when the global `ttl` is disabled, so a
+plugin can expire its own entries without changing shared configuration.
+
+`fetch` and `compute_with` overwrite stale entries, never cache `nil` or
+function results, and bypass the cache entirely when `ttl = 0`. With
+`plain = true` the returned value is a plain Lua copy that is safe to mutate.
+
+```lua
+local repos = memo.cache.fetch("repos", list_repos, { ttl = 30, plain = true })
+```
 
 #### Selectors
 
