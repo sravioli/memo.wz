@@ -166,6 +166,8 @@ local store = memo.state.new {
   auto_load = true,                  -- load from disk on first access
   auto_save = true,                  -- flush to disk on every mutation
   async     = true,                  -- use wezterm.background_task if available
+  atomic    = false,                 -- write via temp file + rename
+  backup    = false,                 -- keep previous file as .bak (atomic only)
 }
 ```
 
@@ -175,13 +177,18 @@ local store = memo.state.new {
 | `auto_load` | boolean | `true`  | Load from disk on first access.               |
 | `auto_save` | boolean | `true`  | Write to disk on every mutation.              |
 | `async`     | boolean | `true`  | Use `wezterm.background_task` when available. |
+| `atomic`    | boolean | `false` | Write to `path.tmp`, then rename over `path`. |
+| `backup`    | boolean | `false` | Keep the previous file as `path.bak`.         |
+
+`memo.state.write_atomic(path, content, { backup? })` exposes the same atomic
+write for callers that persist whole documents without a store.
 
 ### Methods
 
 | Method              | Description                               |
 | ------------------- | ----------------------------------------- |
 | `store:get(key)`    | Retrieve a value by key.                  |
-| `store:set(key, v)` | Store a value (no functions).             |
+| `store:set(key, v, opts?)` | Store a value (no functions). Tables deep-merge unless `{ replace = true }`. |
 | `store:has(key)`    | Check whether a key exists.               |
 | `store:delete(key)` | Delete a single key.                      |
 | `store:clear()`     | Clear all entries.                        |

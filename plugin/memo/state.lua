@@ -34,6 +34,50 @@ local function write_file(path, content)
   return true
 end
 
+---Write `content` to `path` atomically.
+---
+---The content is written to `path .. ".tmp"` first and then renamed over the
+---target, so readers never observe a half-written file. When `backup` is
+---true the previous file is kept as `path .. ".bak"`. On Windows `os.rename`
+---cannot replace an existing file, so the target is moved out of the way
+---first and put back if the final rename fails.
+---@param path    string
+---@param content string
+---@param opts    { backup?: boolean }|nil
+---@return boolean ok
+local function write_atomic(path, content, opts)
+  local backup = opts and opts.backup
+  local tmp = path .. ".tmp"
+  if not write_file(tmp, content) then
+    os.remove(tmp)
+    return false
+  end
+
+  -- POSIX rename replaces the target atomically.
+  if not backup and os.rename(tmp, path) then
+    return true
+  end
+
+  local aside = path .. (backup and ".bak" or ".old")
+  os.remove(aside)
+  local had_target = os.rename(path, aside) ~= nil
+
+  local ok, err = os.rename(tmp, path)
+  if not ok then
+    wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
+    if had_target then
+      os.rename(aside, path)
+    end
+    os.remove(tmp)
+    return false
+  end
+
+  if had_target and not backup then
+    os.remove(aside)
+  end
+  return true
+end
+
 -- ───────────────────────────────────────────────────────────────────────────
 -- Store class
 -- ───────────────────────────────────────────────────────────────────────────
@@ -83,9 +127,14 @@ end
 ---
 ---Keys must be strings because JSON object keys are strings. Functions cannot be persisted.
 ---
+---Table values are deep-merged into an existing table by default, so keys
+---missing from `value` survive. Pass `{ replace = true }` to overwrite the
+---stored value wholesale (e.g. when shrinking a list).
+---
 ---@param key   string
 ---@param value any
-function Store:set(key, value)
+---@param opts  { replace?: boolean }|nil
+function Store:set(key, value, opts)
   if type(key) ~= "string" then
     wt.log_error("[memo.state] keys must be strings, got " .. type(key))
     return
@@ -99,7 +148,7 @@ function Store:set(key, value)
   end
   ensure_loaded(self)
   if type(value) == "table" then
-    if type(self._store.data[key]) ~= "table" then
+    if (opts and opts.replace) or type(self._store.data[key]) ~= "table" then
       self._store.data[key] = {}
     end
     sync_to_global(self._store.data[key], value)
@@ -187,14 +236,21 @@ function Store:save()
   end
 
   local encoded = wt.serde.json_encode(self._store.data)
+  local path = self._path
+  local write = write_file
+  if self._atomic then
+    local backup = self._backup
+    write = function(p, c)
+      return write_atomic(p, c, { backup = backup })
+    end
+  end
 
   if self._async and _has_bg_task then
-    local path = self._path
     wt.background_task(function()
-      write_file(path, encoded)
+      write(path, encoded)
     end)
   else
-    write_file(self._path, encoded)
+    write(path, encoded)
   end
 end
 
@@ -224,6 +280,9 @@ local M = {}
 ---  - `auto_load` (boolean, default true)  Load from disk on first access.
 ---  - `auto_save` (boolean, default true)  Write to disk on every mutation.
 ---  - `async`     (boolean, default true)  Use `background_task` when available.
+---  - `atomic`    (boolean, default false) Write via temp file + rename.
+---  - `backup`    (boolean, default false) Keep the previous file as `.bak`
+---    (only with `atomic`).
 ---@return memo.state.Store
 function M.new(opts)
   assert(opts and opts.path, "[memo.state] opts.path is required")
@@ -237,7 +296,18 @@ function M.new(opts)
     _auto_load = opts.auto_load ~= false,
     _auto_save = opts.auto_save ~= false,
     _async = opts.async ~= false,
+    _atomic = opts.atomic == true,
+    _backup = opts.backup == true,
   }, Store)
 end
+
+---Atomically write `content` to `path` (temp file + rename).
+---
+---Exposed for callers that persist whole documents without a Store.
+---@param path    string
+---@param content string
+---@param opts    { backup?: boolean }|nil  `backup` keeps the old file as `.bak`.
+---@return boolean ok
+M.write_atomic = write_atomic
 
 return M
