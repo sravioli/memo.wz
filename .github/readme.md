@@ -145,7 +145,8 @@ ns.get("key") -- "value"
 ```
 
 All keys are prefixed with `"my-plugin:"`. The namespace wrapper exposes the
-same API as `memo.cache`, scoped to that prefix.
+cache operations scoped to that prefix; it does not include `configure()` or
+`stats()`.
 
 ## Key
 
