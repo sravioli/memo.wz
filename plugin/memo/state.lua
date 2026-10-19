@@ -29,8 +29,12 @@ local function write_file(path, content)
     wt.log_warn(("[memo.state] unable to write %s: %s"):format(path, err))
     return false
   end
-  fh:write(content)
-  fh:close()
+  local wrote, write_err = fh:write(content)
+  local closed, close_err = fh:close()
+  if not wrote or not closed then
+    wt.log_warn(("[memo.state] unable to flush %s: %s"):format(path, write_err or close_err))
+    return false
+  end
   return true
 end
 
@@ -59,14 +63,36 @@ local function write_atomic(path, content, opts)
   end
 
   local aside = path .. (backup and ".bak" or ".old")
-  os.remove(aside)
-  local had_target = os.rename(path, aside) ~= nil
+  local target = io.open(path, "rb")
+  local had_target = target ~= nil
+  if target then
+    target:close()
+    local removed, remove_err = os.remove(aside)
+    if not removed then
+      local existing = io.open(aside, "rb")
+      if existing then
+        existing:close()
+        wt.log_warn(("[memo.state] unable to remove %s: %s"):format(aside, remove_err))
+        os.remove(tmp)
+        return false
+      end
+    end
+    local moved, move_err = os.rename(path, aside)
+    if not moved then
+      wt.log_warn(("[memo.state] unable to preserve %s: %s"):format(path, move_err))
+      os.remove(tmp)
+      return false
+    end
+  end
 
   local ok, err = os.rename(tmp, path)
   if not ok then
     wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
     if had_target then
-      os.rename(aside, path)
+      local restored, restore_err = os.rename(aside, path)
+      if not restored then
+        wt.log_warn(("[memo.state] rollback failed; recover %s: %s"):format(aside, restore_err))
+      end
     end
     os.remove(tmp)
     return false
