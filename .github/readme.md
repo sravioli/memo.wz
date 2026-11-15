@@ -269,14 +269,14 @@ revision, WezTerm version, options, and a reduced example without private data.
 
 ### Local checkout
 
-Clone into `plugins/memo.wz` beneath `wezterm.config_dir`, then replace the
-remote import:
+Load the working tree directly, so edits take effect on the next config
+reload without a commit or a plugin update. Adjust the path to your clone:
 
 ```lua
 local wezterm = require "wezterm"
-local memo = wezterm.plugin.require(
-  "file:///" .. wezterm.config_dir .. "/plugins/memo.wz"
-)
+local root = wezterm.home_dir .. "/path/to/memo.wz/plugin/"
+package.path = root .. "?.lua;" .. root .. "?/init.lua;" .. package.path
+local memo = require "memo.api"
 ```
 
 ### Editor support

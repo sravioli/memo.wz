@@ -49,9 +49,9 @@ You need:
 3. To test the plugin locally, point your WezTerm config at the checkout:
 
    ```lua
-   local memo = wezterm.plugin.require(
-     "file:///" .. wezterm.config_dir .. "/plugins/memo.wz"
-   )
+   local root = wezterm.home_dir .. "/path/to/memo.wz/plugin/"
+   package.path = root .. "?.lua;" .. root .. "?/init.lua;" .. package.path
+   local memo = require "memo.api"
    ```
 
 4. Run the checks to confirm the setup works:
