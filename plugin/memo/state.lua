@@ -38,70 +38,99 @@ local function write_file(path, content)
   return true
 end
 
+local tmp_seq = 0
+
+---Unique sibling path for one write, so concurrent writers (other WezTerm
+---processes, overlapping saves) never share a temporary file.
+---@param path   string
+---@param suffix string
+---@return string
+local function unique_sibling(path, suffix)
+  tmp_seq = tmp_seq + 1
+  return ("%s.%x%x%x%s"):format(path, os.time(), math.random(0, 0x7fffffff), tmp_seq, suffix)
+end
+
+---@param path string
+---@return string|nil content
+local function read_file(path)
+  local fh = io.open(path, "rb")
+  if not fh then
+    return nil
+  end
+  local content = fh:read "*a"
+  fh:close()
+  return content
+end
+
+---Write `content` to a fresh temporary file and rename it over `path`.
+---
+---POSIX rename replaces the target atomically. On Windows `os.rename`
+---cannot replace an existing file, so the target is moved aside first and
+---put back if the final rename fails.
+---@param path    string
+---@param content string
+---@return boolean ok
+local function replace(path, content)
+  local tmp = unique_sibling(path, ".tmp")
+  if not write_file(tmp, content) then
+    os.remove(tmp)
+    return false
+  end
+  if os.rename(tmp, path) then
+    return true
+  end
+
+  local target = io.open(path, "rb")
+  if not target then
+    local ok, err = os.rename(tmp, path)
+    if not ok then
+      wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
+      os.remove(tmp)
+    end
+    return ok == true
+  end
+  target:close()
+  local aside = unique_sibling(path, ".old")
+  local moved, move_err = os.rename(path, aside)
+  if not moved then
+    wt.log_warn(("[memo.state] unable to move %s aside: %s"):format(path, move_err))
+    os.remove(tmp)
+    return false
+  end
+  local ok, err = os.rename(tmp, path)
+  if not ok then
+    wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
+    local restored, restore_err = os.rename(aside, path)
+    if not restored then
+      wt.log_warn(("[memo.state] rollback failed; recover %s: %s"):format(aside, restore_err))
+    end
+    os.remove(tmp)
+    return false
+  end
+  os.remove(aside)
+  return true
+end
+
 ---Write `content` to `path` atomically.
 ---
----The content is written to `path .. ".tmp"` first and then renamed over the
----target, so readers never observe a half-written file. When `backup` is
----true the previous file is kept as `path .. ".bak"`. On Windows `os.rename`
----cannot replace an existing file, so the target is moved out of the way
----first and put back if the final rename fails.
+---Readers never observe a half-written file: content goes to a unique
+---temporary file that is renamed over the target, and concurrent writers
+---cannot interleave (the last complete write wins). When `backup` is true
+---the previous file is first copied to `path .. ".bak"` the same way, so
+---the primary is never missing, even if the process dies mid-write.
 ---@param path    string
 ---@param content string
 ---@param opts    { backup?: boolean }|nil
 ---@return boolean ok
 local function write_atomic(path, content, opts)
-  local backup = opts and opts.backup
-  local tmp = path .. ".tmp"
-  if not write_file(tmp, content) then
-    os.remove(tmp)
-    return false
-  end
-
-  -- POSIX rename replaces the target atomically.
-  if not backup and os.rename(tmp, path) then
-    return true
-  end
-
-  local aside = path .. (backup and ".bak" or ".old")
-  local target = io.open(path, "rb")
-  local had_target = target ~= nil
-  if target then
-    target:close()
-    local removed, remove_err = os.remove(aside)
-    if not removed then
-      local existing = io.open(aside, "rb")
-      if existing then
-        existing:close()
-        wt.log_warn(("[memo.state] unable to remove %s: %s"):format(aside, remove_err))
-        os.remove(tmp)
-        return false
-      end
-    end
-    local moved, move_err = os.rename(path, aside)
-    if not moved then
-      wt.log_warn(("[memo.state] unable to preserve %s: %s"):format(path, move_err))
-      os.remove(tmp)
+  if opts and opts.backup then
+    local previous = read_file(path)
+    if previous and not replace(path .. ".bak", previous) then
+      wt.log_warn(("[memo.state] unable to back up %s"):format(path))
       return false
     end
   end
-
-  local ok, err = os.rename(tmp, path)
-  if not ok then
-    wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
-    if had_target then
-      local restored, restore_err = os.rename(aside, path)
-      if not restored then
-        wt.log_warn(("[memo.state] rollback failed; recover %s: %s"):format(aside, restore_err))
-      end
-    end
-    os.remove(tmp)
-    return false
-  end
-
-  if had_target and not backup then
-    os.remove(aside)
-  end
-  return true
+  return replace(path, content)
 end
 
 -- ───────────────────────────────────────────────────────────────────────────
