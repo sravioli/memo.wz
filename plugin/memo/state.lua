@@ -11,6 +11,7 @@ local wt = require "wezterm" ---@class Wezterm
 
 local ensure_global_tbl = cache._ensure_global_tbl
 local sync_to_global = cache._sync_to_global
+local plain = cache.plain
 
 local _has_serde = wt.serde ~= nil
 local _has_bg_task = type(wt.background_task) == "function"
@@ -203,13 +204,17 @@ function Store:set(key, value, opts)
   end
   ensure_loaded(self)
   if type(value) == "table" then
-    if (opts and opts.replace) or type(self._store.data[key]) ~= "table" then
-      self._store.data[key] = {}
+    -- Merge in plain Lua, then assign once: GLOBAL objects reject integer
+    -- keys, so writing a list through a GLOBAL proxy raises.
+    local current = plain(self._store.data[key])
+    local merged = {}
+    if not (opts and opts.replace) and type(current) == "table" then
+      merged = current
     end
-    sync_to_global(self._store.data[key], value)
-  else
-    self._store.data[key] = value
+    sync_to_global(merged, value)
+    value = merged
   end
+  self._store.data[key] = value
   auto_flush(self)
 end
 
@@ -234,9 +239,8 @@ end
 ---Clear all entries.
 function Store:clear()
   ensure_loaded(self)
-  for k in pairs(self._store.data) do
-    self._store.data[k] = nil
-  end
+  -- Reassign: a GLOBAL object keeps keys set to nil as nulls.
+  self._store.data = {}
   auto_flush(self)
 end
 
@@ -273,11 +277,8 @@ function Store:load()
   end
 
   if type(decoded) == "table" then
-    -- Replace existing data, then deep-copy decoded values.
-    for k in pairs(self._store.data) do
-      self._store.data[k] = nil
-    end
-    sync_to_global(self._store.data, decoded)
+    -- Replace existing data wholesale (assignment copies into GLOBAL).
+    self._store.data = decoded
   end
 end
 
@@ -314,9 +315,15 @@ end
 ---@return table
 function Store:restore()
   ensure_loaded(self)
+  local data = self._store.data
   local copy = {}
-  for k, v in pairs(self._store.data) do
-    copy[k] = v
+  -- Read values by index: GLOBAL `pairs` yields userdata, and deleted keys
+  -- linger as nulls that index to nil.
+  for k in pairs(data) do
+    local v = data[k]
+    if v ~= nil then
+      copy[k] = v
+    end
   end
   return copy
 end
