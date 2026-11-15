@@ -300,14 +300,13 @@ From the repository root, with Lua 5.4 and the named tools installed:
 
 ```sh
 busted --verbose
-luacheck plugin
+luacheck plugin spec
 selene --display-style=quiet plugin
-stylua --check .
+stylua --check plugin spec
 ```
 
-The suite uses a WezTerm mock. See the [contribution guide](contributing.md);
-it still describes hashing, but the implementation uses serialization.
-Use Conventional Commits.
+The suite uses a WezTerm mock. See the [contribution guide](contributing.md)
+and use Conventional Commits.
 
 ## License
 
