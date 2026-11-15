@@ -111,6 +111,14 @@ end
 -- Internal helpers
 -- ───────────────────────────────────────────────────────────────────────────
 
+---Whether `v` is a table or a `wezterm.GLOBAL` table proxy (userdata).
+---@param v any
+---@return boolean
+local function is_tbl(v)
+  local t = type(v)
+  return t == "table" or t == "userdata"
+end
+
 ---@return boolean
 local function ttl_enabled()
   return _cfg.ttl ~= nil
@@ -139,7 +147,7 @@ end
 ---@param entry any
 ---@return boolean
 local function is_wrapper(entry)
-  if type(entry) ~= "table" or entry.expires_at == nil then
+  if not is_tbl(entry) or entry.expires_at == nil then
     return false
   end
   return ttl_enabled() or entry.__memo_ttl == true
@@ -211,9 +219,13 @@ end
 ---Count entries currently in the cache.
 ---@return integer
 local function entry_count()
+  local slot = SLOT()
   local count = 0
-  for _ in pairs(SLOT()) do
-    count = count + 1
+  -- GLOBAL keeps deleted keys as nulls; they index to nil.
+  for k in pairs(slot) do
+    if slot[k] ~= nil then
+      count = count + 1
+    end
   end
   return count
 end
@@ -226,24 +238,28 @@ local function maybe_evict()
     return
   end
   while entry_count() >= _cfg.max_entries do
-    -- Prefer expired entries first.
-    local victim = nil
-    if ttl_enabled() then
-      for k, v in pairs(SLOT()) do
-        if type(v) == "table" and v.expires_at and is_expired(v) then
+    -- Prefer expired entries first, else any live entry. `next` cannot walk
+    -- GLOBAL proxies, so iterate with `pairs`.
+    local slot = SLOT()
+    local victim, fallback = nil, nil
+    for k in pairs(slot) do
+      local v = slot[k]
+      if v ~= nil then
+        fallback = fallback or k
+        if not ttl_enabled() then
+          break
+        end
+        if is_wrapper(v) and is_expired(v) then
           victim = k
           break
         end
       end
     end
-    if not victim then
-      -- Pick arbitrary entry.
-      victim = next(SLOT())
-    end
+    victim = victim or fallback
     if not victim then
       break
     end
-    SLOT()[victim] = nil
+    slot[victim] = nil
     bump "evictions"
   end
 end
@@ -366,9 +382,8 @@ end
 function M.clear(selector)
   local slot = SLOT()
   if not selector then
-    for k in pairs(slot) do
-      slot[k] = nil
-    end
+    -- Reassign: a GLOBAL object keeps keys set to nil as nulls.
+    wt.GLOBAL[SLOT_KEY] = {}
     return
   end
 
@@ -384,8 +399,9 @@ function M.clear(selector)
 
   if selector.older_than and ttl_enabled() then
     local cutoff = _cfg.clock() - selector.older_than
-    for k, v in pairs(slot) do
-      if type(v) == "table" and v.expires_at then
+    for k in pairs(slot) do
+      local v = slot[k]
+      if is_tbl(v) and v.expires_at then
         local created = v.expires_at - (effective_ttl() or 0)
         if created < cutoff then
           slot[k] = nil
@@ -429,7 +445,7 @@ function M.touch(key)
     return
   end
   local entry = SLOT()[key]
-  if type(entry) == "table" and entry.expires_at ~= nil then
+  if is_tbl(entry) and entry.expires_at ~= nil then
     local ttl = _cfg.ttl and _cfg.ttl.default
     if ttl then
       entry.expires_at = _cfg.clock() + ttl
@@ -481,8 +497,13 @@ function M.plain(v)
     return v
   end
   local out = {}
-  for k, val in iter, s, init do
-    out[k] = M.plain(val)
+  -- Read by index: GLOBAL `pairs` yields every value as userdata, and
+  -- deleted keys linger as nulls that index to nil.
+  for k in iter, s, init do
+    local val = v[k]
+    if val ~= nil then
+      out[k] = M.plain(val)
+    end
   end
   return out
 end
@@ -550,8 +571,9 @@ end
 function M.keys(selector)
   local result = {}
   local prefix = selector and selector.prefix
-  for k in pairs(SLOT()) do
-    if not prefix or k:sub(1, #prefix) == prefix then
+  local slot = SLOT()
+  for k in pairs(slot) do
+    if slot[k] ~= nil and (not prefix or k:sub(1, #prefix) == prefix) then
       result[#result + 1] = k
     end
   end
