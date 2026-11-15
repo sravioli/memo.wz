@@ -137,7 +137,7 @@ Pass these to `memo.state.new`.
 | `auto_load` | `boolean` | `true` | Load on first access, once per process slot. |
 | `auto_save` | `boolean` | `true` | Save after `set`, `delete`, and `clear`. |
 | `async` | `boolean` | `true` | Use `wezterm.background_task` if that API exists; otherwise write synchronously. |
-| `atomic` | `boolean` | `false` | Write a `.tmp` file before replacing the destination. |
+| `atomic` | `boolean` | `false` | Write a unique `.tmp` file before replacing the destination. |
 | `backup` | `boolean` | `false` | Retain the previous file as `.bak`; requires `atomic = true`. |
 
 ### Behavior and precedence
@@ -159,15 +159,17 @@ file does not automatically refresh an already loaded store.
 
 Memo logs file-write failures, but `store:save()` returns no success flag.
 JSON encoding can raise. Without serde, store load and save do nothing.
-Temporary-file replacement avoids partial JSON, but keeping backups or
-replacing files on Windows can briefly move the destination out of the way.
-The store does not provide transactions or coordinate concurrent writers.
+Every write goes to its own uniquely named temporary file, renamed over the
+destination, so concurrent writers never interleave: the last complete write
+wins. The store does not provide transactions or merge concurrent changes.
 
 `write_atomic` checks write and close results before replacing the primary.
-If replacement fails, it attempts rollback. If rollback also fails, the log
-identifies the `.bak` or `.old` file you can recover. Creating a missing primary
-keeps an orphan backup. There is no `fsync` guarantee: interruption during
-multi-step replacement can leave the primary missing.
+With `backup`, it first copies the current primary to `.bak` the same way and
+leaves the primary untouched if that fails; on POSIX the primary is never
+missing. On Windows, where rename cannot replace a file, the destination is
+moved aside to a `.old` file and put back if the final rename fails; if that
+also fails, the log names the file to recover. Creating a missing primary keeps
+an orphan backup. There is no `fsync` guarantee.
 
 ## API reference
 
