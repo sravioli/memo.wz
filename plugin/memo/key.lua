@@ -9,6 +9,12 @@
 local tconcat, tinsert, tsort = table.concat, table.insert, table.sort
 local sformat = string.format
 
+---Deterministic serialization and cache keys.
+---@class memo.Key
+local M = {}
+
+local serialize
+
 -- ───────────────────────────────────────────────────────────────────────────
 -- Value serialization
 -- ───────────────────────────────────────────────────────────────────────────
@@ -21,7 +27,7 @@ local sformat = string.format
 ---@param v    any
 ---@param seen table<table, boolean>|nil  Cycle-detection set (internal).
 ---@return string
-local function serialize(v, seen)
+function M.serialize(v, seen)
   local t = type(v)
 
   if t == "string" then
@@ -61,6 +67,7 @@ local function serialize(v, seen)
   -- function, thread, userdata: use address string (session-stable).
   return tostring(v)
 end
+serialize = M.serialize
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- Key generation
@@ -68,13 +75,13 @@ end
 
 ---Generate a deterministic cache key from a name and variadic arguments.
 ---
----String arguments are included verbatim; all other types are serialized.
+---String arguments are included verbatim. All other types are serialized.
 ---Parts are joined with `|`.
 ---
 ---@param name string  Namespace / context identifier.
 ---@param ...  any     Arguments that parameterise the cached computation.
 ---@return string      Deterministic cache key.
-local function make_cache_key(name, ...)
+function M.make_cache_key(name, ...)
   local n = select("#", ...)
   if n == 0 then
     return name
@@ -96,7 +103,4 @@ end
 -- Module exports
 -- ───────────────────────────────────────────────────────────────────────────
 
-return {
-  serialize = serialize,
-  make_cache_key = make_cache_key,
-}
+return M

@@ -43,7 +43,7 @@ return config
 
 Reload to apply the cached theme. The first value remains in the cache across
 config reloads until deleted or WezTerm exits. In an existing config, add the
-import and cache calls before its final return; reuse its config builder.
+import and cache calls before its final return. Reuse its config builder.
 
 ## Usage
 
@@ -59,7 +59,7 @@ end, { ttl = 30 })
 wezterm.log_info(timestamp)
 ```
 
-Calls within 30 seconds reuse the result. `fetch` uses your exact key;
+Calls within 30 seconds reuse the result. `fetch` uses your exact key.
 `compute_with` derives one from a name and arguments. Both accept
 `{ ttl = 0 }` to bypass caching and `{ plain = true }` to return a mutable
 plain-table copy. Errors propagate and are not cached.
@@ -118,43 +118,43 @@ These values override the defaults. Persistent stores take their options in
 
 Pass these to `memo.cache.configure`.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `max_entries` | `integer\|false\|nil` | `nil` | Global entry cap; use a positive integer. `false` removes the cap. |
-| `eviction` | `string` | `"expire-first"` | Only expire-first eviction is implemented: prefer expired entries, otherwise an arbitrary victim. |
-| `ttl.default` | `number?` | `nil` | Default lifetime in seconds; `ttl` itself defaults to `nil`. Pass `ttl = false` to disable it. |
-| `stats` | `boolean` | `false` | Count hits, misses, and evictions. |
-| `debug` | `boolean` | `false` | Accepted setting; no current cache operation emits debug output from it. |
-| `clock` | `fun(): number` | `os.time` | Clock in seconds for expiry; injectable for tests. |
+| Option        | Type                  | Default          | Description                                                                                       |
+| ------------- | --------------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
+| `max_entries` | `integer\|false\|nil` | `nil`            | Global entry cap. Use a positive integer. `false` disables the cap.                               |
+| `eviction`    | `string`              | `"expire-first"` | Only expire-first eviction is implemented: prefer expired entries, otherwise an arbitrary victim. |
+| `ttl.default` | `number?`             | `nil`            | Default lifetime in seconds. `ttl` itself defaults to `nil`. Pass `ttl = false` to disable it.    |
+| `stats`       | `boolean`             | `false`          | Count hits, misses, and evictions.                                                                |
+| `debug`       | `boolean`             | `false`          | Accepted setting. No current cache operation emits debug output from it.                          |
+| `clock`       | `fun(): number`       | `os.time`        | Clock in seconds for expiry. Injectable for tests.                                                |
 
 #### Persistent store options
 
 Pass these to `memo.state.new`.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `path` | `string` | Required | Destination JSON file; supply an absolute path with an existing parent directory. |
-| `auto_load` | `boolean` | `true` | Load on first access, once per process slot. |
-| `auto_save` | `boolean` | `true` | Save after `set`, `delete`, and `clear`. |
-| `async` | `boolean` | `true` | Use `wezterm.background_task` if that API exists; otherwise write synchronously. |
-| `atomic` | `boolean` | `false` | Write a unique `.tmp` file before replacing the destination. |
-| `backup` | `boolean` | `false` | Retain the previous file as `.bak`; requires `atomic = true`. |
+| Option      | Type      | Default  | Description                                                                       |
+| ----------- | --------- | -------- | --------------------------------------------------------------------------------- |
+| `path`      | `string`  | Required | Destination JSON file. Supply an absolute path with an existing parent directory. |
+| `auto_load` | `boolean` | `true`   | Load on first access, once per process slot.                                      |
+| `auto_save` | `boolean` | `true`   | Save after `set`, `delete`, and `clear`.                                          |
+| `async`     | `boolean` | `true`   | Use `wezterm.background_task` if that API exists. Otherwise write synchronously.  |
+| `atomic`    | `boolean` | `false`  | Write a unique `.tmp` file before replacing the destination.                      |
+| `backup`    | `boolean` | `false`  | Retain the previous file as `.bak`. Requires `atomic = true`.                     |
 
 ### Behavior and precedence
 
 Cache configuration retains omitted fields and ignores unknown keys without
-validation. `false` explicitly clears `ttl` or `max_entries`; `nil` cannot
+validation. `false` explicitly clears `ttl` or `max_entries`. `nil` cannot
 clear a field in a Lua options table. Per-call `ttl` overrides the default.
 Avoid global cache changes that would clear or resize another plugin's data.
 
 `cache.set` normally keeps an existing fresh value. Pass `{ force = true }`
-or an explicit TTL to overwrite it; `set(key, nil)` deletes it. Functions
+or an explicit TTL to overwrite it. `set(key, nil)` deletes it. Functions
 cannot be stored with `set`, which logs an error for them. Cache callbacks
 should return serializable values compatible with `wezterm.GLOBAL`.
 
 Cache entries and store mirrors survive config reloads in `wezterm.GLOBAL`,
 but cache configuration is Lua-local and must be reapplied. Only store files
-survive a full restart. `store:load()` explicitly rereads disk; editing its
+survive a full restart. `store:load()` explicitly rereads disk. Editing its
 file does not automatically refresh an already loaded store.
 
 Memo logs file-write failures, but `store:save()` returns no success flag.
@@ -165,86 +165,47 @@ wins. The store does not provide transactions or merge concurrent changes.
 
 `write_atomic` checks write and close results before replacing the primary.
 With `backup`, it first copies the current primary to `.bak` the same way and
-leaves the primary untouched if that fails; on POSIX the primary is never
+leaves the primary untouched if that fails. On POSIX the primary is never
 missing. On Windows, where rename cannot replace a file, the destination is
-moved aside to a `.old` file and put back if the final rename fails; if that
+moved aside to a `.old` file and put back if the final rename fails. If that
 also fails, the log names the file to recover. Creating a missing primary keeps
 an orphan backup. There is no `fsync` guarantee.
 
 ## API reference
 
+The [API reference](../docs/api.md) lists every function, method, and value
+with its parameters and return values. It is generated from the LuaLS
+annotations in `plugin/`, so it matches the code. It has these sections:
+
+- [memo.cache](../docs/api.md#memocache)
+- [memo.key](../docs/api.md#memokey)
+- [memo.state](../docs/api.md#memostate)
+- [memo.cache.Namespace](../docs/api.md#memocachenamespace)
+- [memo.state.Store](../docs/api.md#memostatestore)
+
 `?` marks optional arguments or nullable results. Mutators returning `nil`
-do not report persistence success. Public module names below use `memo`;
-underscore-prefixed helpers are internal.
+do not report persistence success. Public module names below use `memo`.
+Underscore-prefixed helpers are internal.
 
 ### Session cache
 
-| Signature → Return type | Description |
-| --- | --- |
-| `memo.cache.configure(options) → nil` | Update the shared [cache settings](#cache-configuration). |
-| `memo.cache.get(key) → any?` | Get a fresh value or `nil`; update hit/miss stats when enabled. |
-| `memo.cache.set(key, value, options?) → nil` | Store a value; options are `force?` and `ttl?` (seconds). |
-| `memo.cache.has(key) → boolean` | Test freshness without counting a hit/miss. |
-| `memo.cache.delete(key) → nil` | Delete one key. |
-| `memo.cache.clear(selector?) → nil` | Clear everything, or select by `prefix` and/or `older_than` seconds. Combined selectors run independently, not as an intersection. |
-| `memo.cache.expire(key) → nil` | Expire a TTL-wrapped entry; bare entries are unchanged. |
-| `memo.cache.is_fresh(key) → boolean` | Test whether the key currently resolves to a fresh value. |
-| `memo.cache.touch(key) → nil` | Reset a wrapped entry using the global default TTL; no-op without that default. |
-| `memo.cache.compute(name, fn, ...) → any` | Cache the first result of `fn(...)` under an argument-derived key; callback errors propagate. |
-| `memo.cache.compute_with(name, options?, fn, ...) → any` | Argument-derived `fetch`, accepting `ttl?` and `plain?`. |
-| `memo.cache.fetch(key, fn, options?) → any` | Exact-key read-through cache; never store `nil` or function results. |
-| `memo.cache.plain(value) → any` | Recursively copy iterable GLOBAL proxies/tables into ordinary Lua tables. |
-| `memo.cache.keys(selector?) → string[]` | List keys, optionally by `prefix`; does not purge expired entries. |
-| `memo.cache.stats() → table` | Get `{ hits, misses, evictions, entries }`; `entries` includes unpurged expired keys. |
-| `memo.cache.namespace(name) → memo.cache.Namespace` | Prefix keys with `name .. ":"`; see wrapper operations below. |
-
 `compute` caches only one return value. Use `fetch`/`compute_with` for per-call
 TTLs and to avoid caching unsupported results. GLOBAL-backed tables are not
-ordinary mutable tables; use `plain` before editing a returned structure.
-`clear`'s `older_than` selector estimates age from the global default TTL;
-it is unsuitable for precise age filtering of mixed per-entry lifetimes.
+ordinary mutable tables. Use `plain` before editing a returned structure.
+`clear`'s `older_than` selector estimates age from the global default TTL.
+It is unsuitable for precise age filtering of mixed per-entry lifetimes.
 
 ### Namespace wrappers
 
 All wrapper calls use `.`, not `:`. They share global limits and settings.
 
-| Signature → Return type | Description |
-| --- | --- |
-| `ns.get(key) → any?` | Namespaced `cache.get`. |
-| `ns.set(key, value, options?) → nil` | Namespaced `cache.set`. |
-| `ns.has(key) → boolean` | Namespaced `cache.has`. |
-| `ns.delete(key) → nil` | Delete only the prefixed key. |
-| `ns.compute(name, fn, ...) → any` | Namespaced argument-derived computation. |
-| `ns.compute_with(name, options?, fn, ...) → any` | Namespaced configurable computation. |
-| `ns.fetch(key, fn, options?) → any` | Namespaced exact-key lookup. |
-| `ns.expire(key) → nil` | Expire the prefixed TTL entry. |
-| `ns.is_fresh(key) → boolean` | Check the prefixed entry. |
-| `ns.touch(key) → nil` | Refresh it using the global TTL. |
-| `ns.clear(selector?) → nil` | Clear this namespace, optionally narrowed by `prefix`; ignores `older_than`. |
-| `ns.keys(selector?) → string[]` | List relative keys, optionally narrowed by `prefix`. |
-
 ### Keys and persistent stores
-
-| Signature → Return type | Description |
-| --- | --- |
-| `memo.key.serialize(value, seen?) → string` | Serialize values with sorted table keys and a `"<cycle>"` sentinel; `seen` is normally omitted. |
-| `memo.key.make_cache_key(name, ...) → string` | Join the name and arguments with `\|`; string arguments are included verbatim. |
-| `memo.state.new(options) → memo.state.Store` | Create a lazily loaded store; missing `path` raises. |
-| `memo.state.write_atomic(path, content, options?) → boolean` | Synchronously replace a whole file; `options.backup` defaults to `false`. Failures log and return `false`. |
-| `store:get(key) → any?` | Read a value, lazily loading if enabled. |
-| `store:set(key, value, options?) → nil` | Assign a string key; table values merge unless `options.replace = true`. Function values and non-string keys log errors. |
-| `store:has(key) → boolean` | Test whether the value is non-`nil`. |
-| `store:delete(key) → nil` | Remove a key and auto-save if enabled. |
-| `store:clear() → nil` | Remove all data and auto-save if enabled. |
-| `store:load() → nil` | Reread disk, replacing data only after decoding a table; invalid JSON is logged. |
-| `store:save() → nil` | Encode and flush the current mirror. |
-| `store:restore() → table` | Shallow-copy the mirror; nested values remain shared. |
 
 Generated keys are deterministic for ordinary data, not cryptographic hashes.
 Raw strings containing `|` can collide across argument boundaries. Functions
 and userdata serialize by their address-like string, not a portable identity.
 Stores derive GLOBAL slots by replacing path punctuation with `_`, so distinct
-paths can also collide; choose unambiguous paths and namespace names.
+paths can also collide. Choose unambiguous paths and namespace names.
 
 ## Troubleshooting
 
@@ -292,7 +253,7 @@ The [published definitions](https://github.com/DrKJeff16/wezterm-types/blob/main
 omit `fetch`, `compute_with`, `plain`, atomic-write
 options/helpers, and `store:set`'s replacement option. Consult the local
 [cache](../plugin/memo/cache.lua) and [state](../plugin/memo/state.lua)
-annotations for this revision; local class names use lowercase `memo`.
+annotations for this revision. Local class names use lowercase `memo`.
 
 ### Checks and contributions
 

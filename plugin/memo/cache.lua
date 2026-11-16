@@ -308,7 +308,7 @@ function M._reset_config()
   _cfg.clock = os.time
 end
 
----Retrieve a cached value.
+---Get a cached value.
 ---
 ---@param key string  Cache key.
 ---@return any|nil    Stored value or nil.
@@ -483,7 +483,7 @@ end
 ---
 ---Values read from `wezterm.GLOBAL` are userdata proxies: they cannot be
 ---mutated freely, passed to `table.*` helpers or compared by identity. This
----turns them (and nested tables) into ordinary tables; scalars pass through.
+---turns them (and nested tables) into ordinary tables. Scalars pass through.
 ---
 ---@param v any
 ---@return any
@@ -510,15 +510,15 @@ end
 
 ---Read-through cache with an exact key.
 ---
----Returns the cached value for `key` when fresh; otherwise calls `fn()`,
+---Returns the cached value for `key` when fresh. Otherwise it calls `fn()`,
 ---stores a non-nil result (overwriting any stale entry) and returns it.
 ---Errors from `fn` propagate and nothing is cached.
 ---
 ---Options:
---- - `ttl`   seconds the entry stays fresh; `0` bypasses the cache entirely.
+--- - `ttl`   seconds the entry stays fresh. `0` bypasses the cache entirely.
 ---           Defaults to the global TTL, or no expiry when TTL is disabled.
 --- - `plain` return a plain-table copy (see `plain`) instead of the raw
----           GLOBAL-backed value; applies to both hits and fresh results.
+---           GLOBAL-backed value. Applies to both hits and fresh results.
 ---
 ---@param key  string
 ---@param fn   fun(): any
@@ -558,7 +558,7 @@ end
 ---@return any
 function M.compute_with(name, opts, fn, ...)
   local n, args = select("#", ...), { ... }
-  local unpack_ = rawget(table, "unpack") or unpack ---@diagnostic disable-line: deprecated
+  local unpack_ = table.unpack
   return M.fetch(make_cache_key(name, ...), function()
     return fn(unpack_(args, 1, n))
   end, opts)
