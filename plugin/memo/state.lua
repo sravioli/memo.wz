@@ -16,6 +16,9 @@ local plain = cache.plain
 local _has_serde = wt.serde ~= nil
 local _has_bg_task = type(wt.background_task) == "function"
 
+---@class memo.State
+local M = {}
+
 -- ───────────────────────────────────────────────────────────────────────────
 -- Internal helpers
 -- ───────────────────────────────────────────────────────────────────────────
@@ -114,16 +117,18 @@ end
 
 ---Write `content` to `path` atomically.
 ---
----Readers never observe a half-written file: content goes to a unique
----temporary file that is renamed over the target, and concurrent writers
+---Readers never observe a half-written file. Content goes to a unique
+---temporary file that is then renamed over the target. Concurrent writers
 ---cannot interleave (the last complete write wins). When `backup` is true
 ---the previous file is first copied to `path .. ".bak"` the same way, so
 ---the primary is never missing, even if the process dies mid-write.
+---Exposed for callers that persist whole documents without a Store.
+---
 ---@param path    string
 ---@param content string
----@param opts    { backup?: boolean }|nil
+---@param opts    { backup?: boolean }|nil  `backup` keeps the old file as `.bak`.
 ---@return boolean ok
-local function write_atomic(path, content, opts)
+function M.write_atomic(path, content, opts)
   if opts and opts.backup then
     local previous = read_file(path)
     if previous and not replace(path .. ".bak", previous) then
@@ -133,6 +138,7 @@ local function write_atomic(path, content, opts)
   end
   return replace(path, content)
 end
+local write_atomic = M.write_atomic
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- Store class
@@ -170,7 +176,7 @@ end
 -- Instance API
 -- ───────────────────────────────────────────────────────────────────────────
 
----Retrieve a value by key.
+---Get a value by key.
 ---
 ---@param key string
 ---@return any|nil
@@ -284,8 +290,8 @@ end
 
 ---Flush current state to disk as JSON.
 ---
----Uses `wezterm.background_task` when available and `async` is enabled;
----otherwise writes synchronously.
+---Uses `wezterm.background_task` when available and `async` is enabled.
+---Otherwise it writes synchronously.
 function Store:save()
   if not _has_serde then
     return
@@ -332,9 +338,6 @@ end
 -- Factory
 -- ───────────────────────────────────────────────────────────────────────────
 
----@class memo.State
-local M = {}
-
 ---Create a new file-persistent state store.
 ---
 ---@param opts table  Options:
@@ -362,14 +365,5 @@ function M.new(opts)
     _backup = opts.backup == true,
   }, Store)
 end
-
----Atomically write `content` to `path` (temp file + rename).
----
----Exposed for callers that persist whole documents without a Store.
----@param path    string
----@param content string
----@param opts    { backup?: boolean }|nil  `backup` keeps the old file as `.bak`.
----@return boolean ok
-M.write_atomic = write_atomic
 
 return M
