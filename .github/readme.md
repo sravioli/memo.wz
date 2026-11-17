@@ -23,7 +23,9 @@ Caching requires **WezTerm [`20230320-124340-559cb7b0`](https://wezterm.org/conf
 or newer** and Git. Persistent stores also need a
 **[nightly with serde support (2024-02-08) or newer](https://github.com/wezterm/wezterm/commit/8596422abf6257ecfb57b32396c56318c8231886)**
 and a writable destination with an existing parent directory.
-No other plugins or special fonts are required.
+Atomic writes load [warp.wz](https://github.com/sravioli/warp.wz) the first
+time a store saves; `wezterm.plugin.require` fetches it for you. No other
+plugins or special fonts are required.
 
 ### Install and run
 

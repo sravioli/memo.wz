@@ -20,7 +20,9 @@ local has_wezterm = package.config:sub(1, 1) == "/"
 
 local HARNESS = [==[
 local wt = require "wezterm"
-package.path = os.getenv "MEMO_PLUGIN" .. "/?.lua;" .. package.path
+local plugin = os.getenv "MEMO_PLUGIN"
+-- warp from the sibling checkout, not whatever version WezTerm has installed.
+package.path = plugin .. "/?.lua;" .. plugin .. "/../../warp.wz/plugin/?.lua;" .. package.path
 local out = {}
 local function check(name, fn)
   local ok, res = pcall(fn)

@@ -7,6 +7,7 @@
 ---process (the "load guard") and optionally flushed after every mutation.
 
 local cache = require "memo.cache" ---@class memo.Cache
+local deps = require "memo.deps"
 local wt = require "wezterm" ---@class Wezterm
 
 local ensure_global_tbl = cache._ensure_global_tbl
@@ -41,18 +42,6 @@ local function write_file(path, content)
   return true
 end
 
-local tmp_seq = 0
-
----Unique sibling path for one write, so concurrent writers (other WezTerm
----processes, overlapping saves) never share a temporary file.
----@param path   string
----@param suffix string
----@return string
-local function unique_sibling(path, suffix)
-  tmp_seq = tmp_seq + 1
-  return ("%s.%x%x%x%s"):format(path, os.time(), math.random(0, 0x7fffffff), tmp_seq, suffix)
-end
-
 ---@param path string
 ---@return string|nil content
 local function read_file(path)
@@ -65,53 +54,17 @@ local function read_file(path)
   return content
 end
 
----Write `content` to a fresh temporary file and rename it over `path`.
----
----POSIX rename replaces the target atomically. On Windows `os.rename`
----cannot replace an existing file, so the target is moved aside first and
----put back if the final rename fails.
+---Atomically write `content` to `path` through warp (temp file and rename,
+---with a rollback on Windows).
 ---@param path    string
 ---@param content string
 ---@return boolean ok
 local function replace(path, content)
-  local tmp = unique_sibling(path, ".tmp")
-  if not write_file(tmp, content) then
-    os.remove(tmp)
-    return false
-  end
-  if os.rename(tmp, path) then
-    return true
-  end
-
-  local target = io.open(path, "rb")
-  if not target then
-    local ok, err = os.rename(tmp, path)
-    if not ok then
-      wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
-      os.remove(tmp)
-    end
-    return ok == true
-  end
-  target:close()
-  local aside = unique_sibling(path, ".old")
-  local moved, move_err = os.rename(path, aside)
-  if not moved then
-    wt.log_warn(("[memo.state] unable to move %s aside: %s"):format(path, move_err))
-    os.remove(tmp)
-    return false
-  end
-  local ok, err = os.rename(tmp, path)
+  local ok, err = deps.warp().filesystem.write_file(path, content)
   if not ok then
-    wt.log_warn(("[memo.state] unable to replace %s: %s"):format(path, err))
-    local restored, restore_err = os.rename(aside, path)
-    if not restored then
-      wt.log_warn(("[memo.state] rollback failed; recover %s: %s"):format(aside, restore_err))
-    end
-    os.remove(tmp)
-    return false
+    wt.log_warn(("[memo.state] %s"):format(err))
   end
-  os.remove(aside)
-  return true
+  return ok
 end
 
 ---Write `content` to `path` atomically.

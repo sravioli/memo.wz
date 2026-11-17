@@ -21,6 +21,16 @@ M.log_info = record "log_info"
 M.log_warn = record "log_warn"
 M.log_error = record "log_error"
 
+-- warp.wz is a real sibling checkout; memo's atomic writes go through it.
+-- selene: allow(incorrect_standard_library_use)
+local sep = package.config:sub(1, 1)
+package.path = "../warp.wz/plugin/?.lua;../warp.wz/plugin/?/init.lua;" .. package.path
+M.target_triple = sep == "\\" and "x86_64-pc-windows-msvc" or "x86_64-unknown-linux-gnu"
+M.home_dir = os.getenv "HOME" or os.getenv "USERPROFILE"
+M.column_width = function(s)
+  return utf8.len(s) or #s
+end
+
 -- wezterm.to_string fallback.
 function M.to_string(v)
   return tostring(v)
