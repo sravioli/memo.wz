@@ -33,7 +33,9 @@ function M.serialize(v, seen)
   if t == "string" then
     return sformat("%q", v)
   elseif t == "number" then
-    if v % 1 == 0 then
+    -- `v % 1 == 0` also holds for 1e20, which `%d` cannot format;
+    -- tointeger is nil for values outside the integer range.
+    if math.tointeger(v) then
       return sformat("%d", v)
     end
     return sformat("%.17g", v)
@@ -75,8 +77,8 @@ serialize = M.serialize
 
 ---Generate a deterministic cache key from a name and variadic arguments.
 ---
----String arguments are included verbatim. All other types are serialized.
----Parts are joined with `|`.
+---Every argument is serialized, strings quoted, so `("a|b")` and `("a", "b")`,
+---or `1` and `"1"`, never share a key. Parts are joined with `|`.
 ---
 ---@param name string  Namespace / context identifier.
 ---@param ...  any     Arguments that parameterise the cached computation.
@@ -89,12 +91,7 @@ function M.make_cache_key(name, ...)
 
   local parts = { name }
   for i = 1, n do
-    local arg = select(i, ...)
-    if type(arg) == "string" then
-      parts[#parts + 1] = arg
-    else
-      parts[#parts + 1] = serialize(arg)
-    end
+    parts[#parts + 1] = serialize((select(i, ...)))
   end
   return tconcat(parts, "|")
 end

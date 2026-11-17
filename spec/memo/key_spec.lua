@@ -142,8 +142,19 @@ describe("memo.key", function()
       assert.are.equal("foo", make_key "foo")
     end)
 
-    it("joins string args with pipe", function()
-      assert.are.equal("ns|a|b", make_key("ns", "a", "b"))
+    it("joins quoted string args with pipe", function()
+      assert.are.equal('ns|"a"|"b"', make_key("ns", "a", "b"))
+    end)
+
+    it("never gives different arguments the same key", function()
+      assert.are_not.equal(make_key("f", "a|b"), make_key("f", "a", "b"))
+      assert.are_not.equal(make_key("f", 1), make_key("f", "1"))
+      assert.are_not.equal(make_key("f", true), make_key("f", "T"))
+      assert.are_not.equal(make_key("f", nil), make_key("f", "N"))
+    end)
+
+    it("serializes whole-number floats too large for %d", function()
+      assert.are.equal("ns|1e+20", make_key("ns", 1e20))
     end)
 
     it("serializes non-string args", function()
@@ -174,7 +185,7 @@ describe("memo.key", function()
     end)
 
     it("single string arg joins with pipe", function()
-      assert.are.equal("ns|only", make_key("ns", "only"))
+      assert.are.equal('ns|"only"', make_key("ns", "only"))
     end)
 
     it("multiple non-string args all serialized", function()
@@ -202,15 +213,13 @@ describe("memo.key", function()
 
     it("handles empty name", function()
       assert.are.equal("", make_key "")
-      assert.are.equal("|a", make_key("", "a"))
+      assert.are.equal('|"a"', make_key("", "a"))
     end)
 
-    it("name containing pipe delimiter collides with single-arg key", function()
-      -- This documents a known limitation: the name is not escaped,
-      -- so "a|b" with no args produces the same key as "a" with arg "b".
+    it("name containing pipe delimiter does not collide with a string arg", function()
       local k1 = make_key "a|b"
       local k2 = make_key("a", "b")
-      assert.are.equal(k1, k2)
+      assert.are_not.equal(k1, k2)
     end)
 
     it("multiple nil arguments all serialized", function()
