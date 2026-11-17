@@ -15,7 +15,24 @@ local function stub_io()
   local real_open = io.open
   local ctrl = { files = {}, open_calls = 0 }
 
+  local real_rename, real_remove = os.rename, os.remove
+
   function ctrl.install()
+    -- write_atomic writes a temp file, then renames it over the target.
+    os.rename = function(from, to)
+      if ctrl.files[from] == nil then
+        return nil, from .. ": No such file or directory"
+      end
+      ctrl.files[to], ctrl.files[from] = ctrl.files[from], nil
+      return true
+    end
+    os.remove = function(path)
+      if ctrl.files[path] == nil then
+        return real_remove(path)
+      end
+      ctrl.files[path] = nil
+      return true
+    end
     ---@diagnostic disable-next-line: duplicate-set-field
     io.open = function(path, mode)
       ctrl.open_calls = ctrl.open_calls + 1
@@ -39,13 +56,17 @@ local function stub_io()
         }
       end
       if mode:find "w" then
+        ctrl.writes = ctrl.writes or {}
+        ctrl.writes[#ctrl.writes + 1] = path
         local buf = {}
         return {
-          write = function(_, data)
+          write = function(self, data)
             buf[#buf + 1] = data
+            return self
           end,
           close = function()
             ctrl.files[path] = table.concat(buf)
+            return true
           end,
         }
       end
@@ -60,6 +81,7 @@ local function stub_io()
 
   function ctrl.restore()
     io.open = real_open
+    os.rename, os.remove = real_rename, real_remove
   end
 
   return ctrl
@@ -187,6 +209,21 @@ describe("memo.state", function()
   -- ─────────────────────────────────────────────────────────────────────
 
   describe("save / load", function()
+    it("writes through a temp file by default, never in place", function()
+      local path = "/tmp/atomic-default.json"
+      io_ctrl.writes = {}
+      local s = state.new { path = path, auto_save = false, async = false }
+      s:set("k", "v")
+      s:save()
+      assert.is_not_nil(io_ctrl.files[path])
+      for _, written in ipairs(io_ctrl.writes) do
+        assert.are_not.equal(path, written)
+      end
+      for name in pairs(io_ctrl.files) do
+        assert.is_nil(name:find "%.tmp$", name)
+      end
+    end)
+
     it("round-trips data through JSON", function()
       local path = "/tmp/roundtrip.json"
       local s1 = state.new { path = path, auto_save = false, async = false }

@@ -332,8 +332,8 @@ memo.key.make_cache_key(name: string, ...: any) -> Deterministic: string
 
 Generate a deterministic cache key from a name and variadic arguments.
 
-String arguments are included verbatim. All other types are serialized.
-Parts are joined with `|`.
+Every argument is serialized, strings quoted, so `("a|b")` and `("a", "b")`,
+or `1` and `"1"`, never share a key. Parts are joined with `|`.
 
 **Parameters:**
 
@@ -385,7 +385,7 @@ Create a new file-persistent state store.
 - `auto_load` (boolean, default true) Load from disk on first access.
 - `auto_save` (boolean, default true) Write to disk on every mutation.
 - `async` (boolean, default true) Use `background_task` when available.
-- `atomic` (boolean, default false) Write via temp file + rename.
+- `atomic` (boolean, default true) Write via temp file + rename.
 - `backup` (boolean, default false) Keep the previous file as `.bak`
   (only with `atomic`).
 

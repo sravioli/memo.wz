@@ -17,7 +17,24 @@ local function stub_io()
   local real_open = io.open
   local ctrl = { files = {}, open_calls = 0 }
 
+  local real_rename, real_remove = os.rename, os.remove
+
   function ctrl.install()
+    -- write_atomic writes a temp file, then renames it over the target.
+    os.rename = function(from, to)
+      if ctrl.files[from] == nil then
+        return nil, from .. ": No such file or directory"
+      end
+      ctrl.files[to], ctrl.files[from] = ctrl.files[from], nil
+      return true
+    end
+    os.remove = function(path)
+      if ctrl.files[path] == nil then
+        return real_remove(path)
+      end
+      ctrl.files[path] = nil
+      return true
+    end
     ---@diagnostic disable-next-line: duplicate-set-field
     io.open = function(path, mode)
       ctrl.open_calls = ctrl.open_calls + 1
@@ -43,11 +60,13 @@ local function stub_io()
       if mode:find "w" then
         local buf = {}
         return {
-          write = function(_, data)
+          write = function(self, data)
             buf[#buf + 1] = data
+            return self
           end,
           close = function()
             ctrl.files[path] = table.concat(buf)
+            return true
           end,
         }
       end
@@ -62,6 +81,7 @@ local function stub_io()
 
   function ctrl.restore()
     io.open = real_open
+    os.rename, os.remove = real_rename, real_remove
   end
 
   return ctrl

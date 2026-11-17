@@ -137,7 +137,7 @@ Pass these to `memo.state.new`.
 | `auto_load` | `boolean` | `true`   | Load on first access, once per process slot.                                      |
 | `auto_save` | `boolean` | `true`   | Save after `set`, `delete`, and `clear`.                                          |
 | `async`     | `boolean` | `true`   | Use `wezterm.background_task` if that API exists. Otherwise write synchronously.  |
-| `atomic`    | `boolean` | `false`  | Write a unique `.tmp` file before replacing the destination.                      |
+| `atomic`    | `boolean` | `true`   | Write a unique `.tmp` file before replacing the destination.                      |
 | `backup`    | `boolean` | `false`  | Retain the previous file as `.bak`. Requires `atomic = true`.                     |
 
 ### Behavior and precedence

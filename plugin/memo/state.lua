@@ -345,7 +345,7 @@ end
 ---  - `auto_load` (boolean, default true)  Load from disk on first access.
 ---  - `auto_save` (boolean, default true)  Write to disk on every mutation.
 ---  - `async`     (boolean, default true)  Use `background_task` when available.
----  - `atomic`    (boolean, default false) Write via temp file + rename.
+---  - `atomic`    (boolean, default true) Write via temp file + rename.
 ---  - `backup`    (boolean, default false) Keep the previous file as `.bak`
 ---    (only with `atomic`).
 ---@return memo.state.Store
@@ -361,7 +361,8 @@ function M.new(opts)
     _auto_load = opts.auto_load ~= false,
     _auto_save = opts.auto_save ~= false,
     _async = opts.async ~= false,
-    _atomic = opts.atomic == true,
+    -- In-place writes leave an empty file if WezTerm dies mid-write.
+    _atomic = opts.atomic ~= false,
     _backup = opts.backup == true,
   }, Store)
 end
