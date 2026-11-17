@@ -475,18 +475,23 @@ describe("memo.state", function()
   end)
 
   -- ─────────────────────────────────────────────────────────────────────
-  -- async save
+  -- save and slots
   -- ─────────────────────────────────────────────────────────────────────
 
-  describe("sync save fallback", function()
-    it("writes synchronously when background_task is unavailable", function()
-      -- background_task is not set in the mock, so _has_bg_task is false.
-      -- async=true in opts but the module falls back to sync writes.
-      local path = "/tmp/sync_fallback.json"
-      local store = state.new { path = path, async = true, auto_save = false }
+  describe("save", function()
+    it("writes synchronously", function()
+      local path = "/tmp/sync_save.json"
+      local store = state.new { path = path, auto_save = false }
       store:set("k", "v")
       store:save()
       assert.is_not_nil(io_ctrl.files[path])
+    end)
+
+    it("gives paths that escape alike their own slots", function()
+      local a = state.new { path = "/tmp/a_b.json", auto_save = false, auto_load = false }
+      local b = state.new { path = "/tmp/a/b.json", auto_save = false, auto_load = false }
+      a:set("k", "from a")
+      assert.is_nil(b:get "k")
     end)
   end)
 

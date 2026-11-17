@@ -1,7 +1,7 @@
 ---@diagnostic disable: undefined-global
 
 --- Tests that require reloading memo.state under different mock conditions.
---- These cover module-level branches (`_has_serde`, `_has_bg_task`) that are
+--- These cover module-level branches (`_has_serde`) that are
 --- captured at require-time and cannot be toggled in normal tests.
 
 require "spec.mocks.wezterm"
@@ -88,7 +88,7 @@ local function stub_io()
 end
 
 ---Force-reload memo.state (and only memo.state) so module-level locals
----like `_has_serde` and `_has_bg_task` are re-evaluated.
+---like `_has_serde` are re-evaluated.
 local function reload_state()
   package.loaded["memo.state"] = nil
   return require "memo.state"
@@ -146,71 +146,5 @@ describe("memo.state (serde unavailable)", function()
     assert.is_nil(store:get "k")
     -- io.open is not called because load returns early.
     assert.are.equal(open_calls_before, io_ctrl.open_calls)
-  end)
-end)
-
--- ─────────────────────────────────────────────────────────────────────────
--- Tests: _has_bg_task = true
--- ─────────────────────────────────────────────────────────────────────────
-
-describe("memo.state (background_task available)", function()
-  local io_ctrl
-  local bg_tasks
-
-  setup(function()
-    bg_tasks = {}
-    wt.background_task = function(fn)
-      bg_tasks[#bg_tasks + 1] = fn
-    end
-  end)
-
-  teardown(function()
-    wt.background_task = nil
-    reload_state() -- restore module without background_task
-  end)
-
-  before_each(function()
-    wt._reset()
-    for k in pairs(wt.GLOBAL) do
-      wt.GLOBAL[k] = nil
-    end
-    bg_tasks = {}
-    io_ctrl = stub_io()
-    io_ctrl.install()
-  end)
-
-  after_each(function()
-    io_ctrl.restore()
-  end)
-
-  it("save uses background_task when async=true and background_task exists", function()
-    local state = reload_state()
-    local path = "/tmp/bg_save.json"
-    local store = state.new { path = path, auto_save = false, async = true }
-    store:set("k", "v")
-    store:save()
-
-    -- The file is not written yet because the write is queued in background_task.
-    assert.is_nil(io_ctrl.files[path])
-    -- A background task is scheduled.
-    assert.are.equal(1, #bg_tasks)
-
-    -- Execute the background task.
-    bg_tasks[1]()
-    -- The queued write now reaches disk.
-    assert.is_not_nil(io_ctrl.files[path])
-  end)
-
-  it("save writes synchronously when async=false despite background_task", function()
-    local state = reload_state()
-    local path = "/tmp/sync_save_with_bg.json"
-    local store = state.new { path = path, auto_save = false, async = false }
-    store:set("k", "v")
-    store:save()
-
-    -- The file is written immediately on the sync path because async=false.
-    assert.is_not_nil(io_ctrl.files[path])
-    -- No background task is scheduled.
-    assert.are.equal(0, #bg_tasks)
   end)
 end)

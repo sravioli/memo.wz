@@ -384,7 +384,6 @@ Create a new file-persistent state store.
 - `path` (string, required) Absolute path to the JSON file.
 - `auto_load` (boolean, default true) Load from disk on first access.
 - `auto_save` (boolean, default true) Write to disk on every mutation.
-- `async` (boolean, default true) Use `background_task` when available.
 - `atomic` (boolean, default true) Write via temp file + rename.
 - `backup` (boolean, default false) Keep the previous file as `.bak`
   (only with `atomic`).
@@ -651,10 +650,7 @@ as loaded so subsequent `ensure_loaded` calls are no-ops.
 memo.state.Store:save()
 ```
 
-Flush current state to disk as JSON.
-
-Uses `wezterm.background_task` when available and `async` is enabled.
-Otherwise it writes synchronously.
+Flush current state to disk as JSON, synchronously.
 
 ### memo.state.Store:restore
 

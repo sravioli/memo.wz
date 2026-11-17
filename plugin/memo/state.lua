@@ -14,7 +14,6 @@ local sync_to_global = cache._sync_to_global
 local plain = cache.plain
 
 local _has_serde = wt.serde ~= nil
-local _has_bg_task = type(wt.background_task) == "function"
 
 ---@class memo.State
 local M = {}
@@ -149,7 +148,6 @@ local write_atomic = M.write_atomic
 ---@field _store     table    Reference into `wt.GLOBAL` slot (`{ loaded, data }`).
 ---@field _auto_load boolean  Load from disk on first access.
 ---@field _auto_save boolean  Flush to disk on every mutation.
----@field _async     boolean  Use background_task for writes if available.
 local Store = {}
 Store.__index = Store
 
@@ -288,10 +286,7 @@ function Store:load()
   end
 end
 
----Flush current state to disk as JSON.
----
----Uses `wezterm.background_task` when available and `async` is enabled.
----Otherwise it writes synchronously.
+---Flush current state to disk as JSON, synchronously.
 function Store:save()
   if not _has_serde then
     return
@@ -307,13 +302,7 @@ function Store:save()
     end
   end
 
-  if self._async and _has_bg_task then
-    wt.background_task(function()
-      write(path, encoded)
-    end)
-  else
-    write(path, encoded)
-  end
+  write(path, encoded)
 end
 
 ---Return a shallow copy of all stored data.
@@ -344,7 +333,6 @@ end
 ---  - `path`      (string, required)  Absolute path to the JSON file.
 ---  - `auto_load` (boolean, default true)  Load from disk on first access.
 ---  - `auto_save` (boolean, default true)  Write to disk on every mutation.
----  - `async`     (boolean, default true)  Use `background_task` when available.
 ---  - `atomic`    (boolean, default true) Write via temp file + rename.
 ---  - `backup`    (boolean, default false) Keep the previous file as `.bak`
 ---    (only with `atomic`).
@@ -352,7 +340,8 @@ end
 function M.new(opts)
   assert(opts and opts.path, "[memo.state] opts.path is required")
 
-  local slot_key = "__memo_state_" .. opts.path:gsub("[^%w_%-%.]", "_")
+  -- The raw path: escaping it would let `a/b` and `a_b` share one slot.
+  local slot_key = "__memo_state_" .. opts.path
   local store = ensure_global_tbl(slot_key, { loaded = false, data = {} })
 
   return setmetatable({
@@ -360,7 +349,6 @@ function M.new(opts)
     _store = store,
     _auto_load = opts.auto_load ~= false,
     _auto_save = opts.auto_save ~= false,
-    _async = opts.async ~= false,
     -- In-place writes leave an empty file if WezTerm dies mid-write.
     _atomic = opts.atomic ~= false,
     _backup = opts.backup == true,

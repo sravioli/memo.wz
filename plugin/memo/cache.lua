@@ -210,7 +210,8 @@ local function raw_set(key, value, opts)
   local slot = SLOT()
   local ttl = effective_ttl(opts)
   if ttl then
-    slot[key] = { value = value, expires_at = _cfg.clock() + ttl, __memo_ttl = true }
+    local now = _cfg.clock()
+    slot[key] = { value = value, expires_at = now + ttl, created_at = now, __memo_ttl = true }
   else
     slot[key] = value
   end
@@ -402,7 +403,8 @@ function M.clear(selector)
     for k in pairs(slot) do
       local v = slot[k]
       if is_tbl(v) and v.expires_at then
-        local created = v.expires_at - (effective_ttl() or 0)
+        -- Entries from before `created_at` was stored: estimate from the default TTL.
+        local created = v.created_at or (v.expires_at - (effective_ttl() or 0))
         if created < cutoff then
           slot[k] = nil
           bump "evictions"

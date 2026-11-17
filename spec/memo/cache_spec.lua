@@ -440,6 +440,20 @@ describe("memo.cache", function()
       assert.are.equal("y", cache.get "new")
     end)
 
+    it("measures age from creation for entries with their own ttl", function()
+      local clock = 1000
+      cache.configure {
+        ttl = { default = 60 },
+        clock = function()
+          return clock
+        end,
+      }
+      cache.set("long", "x", { ttl = 3600 })
+      clock = 1200
+      cache.clear { older_than = 120 }
+      assert.is_nil(cache.get "long")
+    end)
+
     it("is a no-op when TTL is disabled", function()
       cache.set("k", "v")
       cache.clear { older_than = 0 }
